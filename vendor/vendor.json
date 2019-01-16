@@ -1,0 +1,6 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [],
+	"rootPath": "github.com/TykTechnologies/tyk-k8s"
+}
