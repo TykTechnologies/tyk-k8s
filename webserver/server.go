@@ -3,8 +3,8 @@ package webserver
 import (
 	"context"
 	"crypto/sha256"
+	"github.com/TykTechnologies/tyk-k8s/logger"
 	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 	"io/ioutil"
 	"net/http"
@@ -12,6 +12,7 @@ import (
 )
 
 var server *WebServer
+var log = logger.GetLogger("web")
 
 // WebServer config
 type Config struct {
@@ -47,7 +48,7 @@ func (s *WebServer) AddRoute(method string, route string, handler func(http.Resp
 
 func (s *WebServer) Config(cfg *Config) {
 	if cfg == nil {
-		glog.Info("using default config on port 9797")
+		log.Info("using default config on port 9797")
 		s.cfg = &Config{
 			Addr: ":9797",
 		}
@@ -59,7 +60,7 @@ func (s *WebServer) Config(cfg *Config) {
 
 func (s *WebServer) Start() {
 	if s.srv != nil {
-		glog.Warning("server already started")
+		log.Warning("server already started")
 		return
 	}
 
@@ -71,9 +72,9 @@ func (s *WebServer) Start() {
 	s.srv = srv
 
 	if s.cfg.CertFile == "" {
-		glog.Error(srv.ListenAndServe())
+		log.Error(srv.ListenAndServe())
 	} else {
-		glog.Error(srv.ListenAndServeTLS(s.cfg.CertFile, s.cfg.KeyFile))
+		log.Error(srv.ListenAndServeTLS(s.cfg.CertFile, s.cfg.KeyFile))
 	}
 
 }
@@ -100,7 +101,7 @@ func ReadConfigFile(configFile string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	glog.Infof("New configuration: sha256sum %x", sha256.Sum256(data))
+	log.Infof("New configuration: sha256sum %x", sha256.Sum256(data))
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {

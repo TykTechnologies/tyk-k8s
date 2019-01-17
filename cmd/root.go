@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/golang/glog"
+	"github.com/TykTechnologies/tyk-k8s/tyk"
 	"os"
 
 	"github.com/mitchellh/go-homedir"
@@ -63,8 +63,9 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err != nil {
-		glog.Fatal(err)
+		log.Fatal(err)
 	}
 
-	glog.Infof("Using config file: %v", viper.ConfigFileUsed())
+	log.Infof("Using config file: %v", viper.ConfigFileUsed())
+	tyk.Init()
 }
