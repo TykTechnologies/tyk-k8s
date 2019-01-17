@@ -202,9 +202,9 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string) (map[st
 	hName := fmt.Sprintf("%s.%s", sName, ns)
 	slugID := sName + "-inbound"
 	// inbound listener
-	inboundID, err := tyk.CreateService(sName+"-inbound", "http://localhost:6767", "/", tyk.DefaultTemplate, hName, slugID, []string{meshTag, sName})
+	inboundID, err := tyk.CreateService(slugID, "http://localhost:6767", "/", tyk.DefaultTemplate, hName, slugID, []string{meshTag, sName})
 	if err != nil {
-		return annotations, err
+		return annotations, fmt.Errorf("failed to create inbound service %v: %v", slugID, err.Error())
 	}
 
 	annotations[admissionWebhookAnnotationInboundServiceIDKey] = inboundID
@@ -219,9 +219,9 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string) (map[st
 	}
 
 	meshSlugID := sName + "-mesh"
-	meshID, err := tyk.CreateService(sName, tgt, listenPath, tyk.DefaultTemplate, "", meshSlugID, []string{meshTag})
+	meshID, err := tyk.CreateService(meshSlugID, tgt, listenPath, tyk.DefaultTemplate, "", meshSlugID, []string{meshTag})
 	if err != nil {
-		return annotations, err
+		return annotations, fmt.Errorf("failed to create mesh service %v: %v", meshSlugID, err.Error())
 	}
 
 	annotations[admissionWebhookAnnotationMeshServiceIDKey] = meshID
