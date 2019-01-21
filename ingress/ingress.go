@@ -4,10 +4,12 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
+	"github.com/TykTechnologies/tyk-k8s/injector"
 	"github.com/TykTechnologies/tyk-k8s/logger"
 	"github.com/TykTechnologies/tyk-k8s/tyk"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
+	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -307,4 +309,69 @@ func (c *ControlServer) watchIngresses() {
 
 	c.stopCh = make(chan struct{})
 	go c.controller.Run(c.stopCh)
+}
+
+func (c *ControlServer) watchPods() {
+	watchList := cache.NewListWatchFromClient(c.client.ExtensionsV1beta1().RESTClient(), "pods", v1.NamespaceAll,
+		fields.Everything())
+	c.store, c.controller = cache.NewInformer(
+		watchList,
+		&v1.Pod{},
+		time.Second*10,
+		cache.ResourceEventHandlerFuncs{
+			DeleteFunc: c.handlePodDelete,
+		},
+	)
+
+	c.stopCh = make(chan struct{})
+	go c.controller.Run(c.stopCh)
+}
+
+func (c *ControlServer) handlePodDelete(obj interface{}) {
+	pd, ok := obj.(*v1.Pod)
+	if !ok {
+		log.Errorf("type not allowed for RS watcher: %v", reflect.TypeOf(obj))
+		return
+	}
+
+	_, proc := pd.Annotations[injector.AdmissionWebhookAnnotationInjectKey]
+	if !proc {
+		return
+	}
+
+	remPds, err := c.client.CoreV1().Pods(pd.Namespace).List(v12.ListOptions{})
+	if err != nil {
+		log.Error(err)
+	}
+
+	if len(remPds.Items) > 0 {
+		return
+	}
+
+	// Last pod
+	serviceID, ok := pd.Annotations[injector.AdmissionWebhookAnnotationInboundServiceIDKey]
+	if !ok {
+		log.Error("service ID not found in annotations, skipping cleanup")
+		return
+	}
+
+	meshID, ok := pd.Annotations[injector.AdmissionWebhookAnnotationMeshServiceIDKey]
+	if !ok {
+		log.Error("mesh ID not found in annotations, skipping cleanup")
+		return
+	}
+
+	err = tyk.DeleteByID(serviceID)
+	if err != nil {
+		log.Error("failed to remove service API: ", err)
+		return
+	}
+
+	err = tyk.DeleteByID(meshID)
+	if err != nil {
+		log.Error("failed to remove mesh API: ", err)
+		return
+	}
+
+	log.Info("successfully removed ", serviceID, " and ", meshID)
 }

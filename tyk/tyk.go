@@ -252,6 +252,11 @@ func GetBySlug(slug string) (*dashboard.DBApiDefinition, error) {
 	return nil, fmt.Errorf("service with name %s not found", slug)
 }
 
+func DeleteByID(id string) error {
+	cl := newClient()
+	return cl.DeleteAPI(id)
+}
+
 var defaultAPITemplate = `
 {
     "name": "{{.Name}}{{ range $i, $e := .GatewayTags }} #{{$e}}{{ end }}",

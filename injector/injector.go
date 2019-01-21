@@ -33,11 +33,11 @@ var ignoredNamespaces = []string{
 }
 
 const (
-	admissionWebhookAnnotationInjectKey           = "injector.tyk.io/inject"
+	AdmissionWebhookAnnotationInjectKey           = "injector.tyk.io/inject"
 	admissionWebhookAnnotationStatusKey           = "injector.tyk.io/status"
 	admissionWebhookAnnotationRouteKey            = "injector.tyk.io/route"
-	admissionWebhookAnnotationInboundServiceIDKey = "injector.tyk.io/inbound-service-id"
-	admissionWebhookAnnotationMeshServiceIDKey    = "injector.tyk.io/mesh-service-id"
+	AdmissionWebhookAnnotationInboundServiceIDKey = "injector.tyk.io/inbound-service-id"
+	AdmissionWebhookAnnotationMeshServiceIDKey    = "injector.tyk.io/mesh-service-id"
 
 	meshTag = "mesh"
 )
@@ -100,7 +100,7 @@ func mutationRequired(ignoredList []string, metadata *metav1.ObjectMeta) bool {
 	if strings.ToLower(status) == "injected" {
 		required = false
 	} else {
-		switch strings.ToLower(annotations[admissionWebhookAnnotationInjectKey]) {
+		switch strings.ToLower(annotations[AdmissionWebhookAnnotationInjectKey]) {
 		default:
 			required = false
 		case "y", "yes", "true", "on":
@@ -184,7 +184,7 @@ func createPatch(pod *corev1.Pod, sidecarConfig *Config, annotations map[string]
 
 // create service routes
 func createServiceRoutes(pod *corev1.Pod, annotations map[string]string) (map[string]string, error) {
-	_, idExists := annotations[admissionWebhookAnnotationInboundServiceIDKey]
+	_, idExists := annotations[AdmissionWebhookAnnotationInboundServiceIDKey]
 	if idExists {
 		return annotations, nil
 	}
@@ -217,7 +217,7 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string) (map[st
 		return annotations, fmt.Errorf("failed to create inbound service %v: %v", slugID, err.Error())
 	}
 
-	annotations[admissionWebhookAnnotationInboundServiceIDKey] = inboundID
+	annotations[AdmissionWebhookAnnotationInboundServiceIDKey] = inboundID
 
 	// mesh route
 	tgt := fmt.Sprintf("http://%s", hName)
@@ -244,7 +244,7 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string) (map[st
 		return annotations, fmt.Errorf("failed to create mesh service %v: %v", meshSlugID, err.Error())
 	}
 
-	annotations[admissionWebhookAnnotationMeshServiceIDKey] = meshID
+	annotations[AdmissionWebhookAnnotationMeshServiceIDKey] = meshID
 
 	return annotations, nil
 }
