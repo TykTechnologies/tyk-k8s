@@ -344,8 +344,12 @@ func (c *ControlServer) handlePodDelete(obj interface{}) {
 		log.Error(err)
 	}
 
-	if len(remPds.Items) > 0 {
-		return
+	rem := false
+	for _, pds := range remPds.Items {
+		_, rem = pds.Annotations[injector.AdmissionWebhookAnnotationInjectKey]
+		if rem {
+			return
+		}
 	}
 
 	// Last pod
