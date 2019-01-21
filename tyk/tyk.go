@@ -34,6 +34,19 @@ type TykConf struct {
 	OrgID  string `yaml:"org_id"`
 }
 
+type APIDefOptions struct {
+	Name         string
+	Target       string
+	ListenPath   string
+	TemplateName string
+	Hostname     string
+	Slug         string
+	Tags         []string
+	APIID        string
+	ID           string
+	LegacyAPIDef *dashboard.DBApiDefinition
+}
+
 var cfg *TykConf
 var log = logger.GetLogger("tyk-api")
 
@@ -65,37 +78,44 @@ func getTemplate(name string) (string, error) {
 	return "", errors.New("not implemented")
 }
 
-func CreateService(name, target, listenPath, templateName, hostname, slug string, tags []string) (string, error) {
+func TemplateService(opts *APIDefOptions) ([]byte, error) {
 	defTpl := defaultAPITemplate
-	if templateName != DefaultTemplate {
+	if opts.TemplateName != DefaultTemplate {
 		var err error
-		defTpl, err = getTemplate(templateName)
+		defTpl, err = getTemplate(opts.TemplateName)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
 	tplVars := map[string]interface{}{
-		"Name":        name,
-		"Slug":        cleanSlug(slug),
+		"Name":        opts.Name,
+		"Slug":        cleanSlug(opts.Slug),
 		"OrgID":       cfg.OrgID,
-		"ListenPath":  listenPath,
-		"Target":      target,
-		"GatewayTags": tags,
-		"HostName":    hostname,
+		"ListenPath":  opts.ListenPath,
+		"Target":      opts.Target,
+		"GatewayTags": opts.Tags,
+		"HostName":    opts.Hostname,
 	}
 
 	var apiDefStr bytes.Buffer
 	tpl := template.Must(template.New("inject").Parse(defTpl))
 	err := tpl.Execute(&apiDefStr, tplVars)
 	if err != nil {
+		return nil, err
+	}
+
+	return apiDefStr.Bytes(), nil
+}
+
+func CreateService(opts *APIDefOptions) (string, error) {
+	adBytes, err := TemplateService(opts)
+	if err != nil {
 		return "", err
 	}
 
-	//log.Warning(apiDefStr.String())
-
 	apiDef := objects.NewDefinition()
-	err = json.Unmarshal(apiDefStr.Bytes(), apiDef)
+	err = json.Unmarshal(adBytes, apiDef)
 	if err != nil {
 		return "", err
 	}
@@ -123,6 +143,94 @@ func DeleteBySlug(slug string) error {
 	}
 
 	return fmt.Errorf("service with name %s not found for removal, remove manually", slug)
+}
+
+func UpdateAPIs(svcs map[string]*APIDefOptions) error {
+	cl := newClient()
+
+	allServices, err := cl.FetchAPIs()
+	if err != nil {
+		return err
+	}
+
+	errs := make([]error, 0)
+	toUpdate := map[string]*APIDefOptions{}
+	toCreate := map[string]*APIDefOptions{}
+
+	// To update
+	for ingressID, o := range svcs {
+		cSlug := cleanSlug(ingressID)
+		for _, s := range allServices {
+			if cSlug == s.Slug {
+				o.LegacyAPIDef = &s
+				toUpdate[cSlug] = o
+			}
+		}
+	}
+
+	// To create
+	for ingressID, o := range svcs {
+		cSlug := cleanSlug(ingressID)
+		_, updatingAlready := toUpdate[cSlug]
+		if updatingAlready {
+			// skip
+			continue
+		}
+
+		toCreate[cSlug] = o
+	}
+
+	for _, opts := range toUpdate {
+		adBytes, err := TemplateService(opts)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		apiDef := objects.NewDefinition()
+		err = json.Unmarshal(adBytes, apiDef)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		// Retain identity
+		apiDef.Id = opts.LegacyAPIDef.Id
+		apiDef.APIID = opts.LegacyAPIDef.APIID
+		apiDef.OrgID = opts.LegacyAPIDef.OrgID
+
+		err = cl.UpdateAPI(apiDef)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+	}
+
+	for _, opts := range toCreate {
+		id, err := CreateService(opts)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		log.Info("created: ", id)
+	}
+
+	if len(errs) > 0 {
+		msg := ""
+		for i, e := range errs {
+			if i != 0 {
+				msg = e.Error()
+			}
+			msg += "; " + msg
+		}
+
+		return fmt.Errorf(msg)
+	}
+
+	return nil
+
 }
 
 func GetBySlug(slug string) (*dashboard.DBApiDefinition, error) {

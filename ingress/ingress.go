@@ -120,25 +120,29 @@ func doAdd(ing *v1beta1.Ingress) error {
 		hName = r0.Host
 
 		for _, p := range r0.HTTP.Paths {
-			listenOn := p.Path
+			opts := &tyk.APIDefOptions{}
+			opts.ListenPath = p.Path
 			svcN := p.Backend.ServiceName
 			svcP := p.Backend.ServicePort.IntVal
-			serviceName := getAPIName(ing.Name, svcN)
-			target := fmt.Sprintf("http://%s.%s:%d", svcN, ing.Namespace, svcP)
-			ingressID := generateIngressID(ing.Name, ing.Namespace, p)
+			opts.Name = getAPIName(ing.Name, svcN)
+			opts.Target = fmt.Sprintf("http://%s.%s:%d", svcN, ing.Namespace, svcP)
+			opts.Slug = generateIngressID(ing.Name, ing.Namespace, p)
+			opts.TemplateName = tyk.DefaultTemplate
+			opts.Hostname = hName
+			opts.Tags = tags
 
-			_, ok := opLog.Load("add" + ingressID)
+			_, ok := opLog.Load("add" + opts.Slug)
 			if ok {
 				log.Info("ingress already processed")
 				continue
 			}
 
-			_, err := tyk.CreateService(serviceName, target, listenOn, tyk.DefaultTemplate, hName, ingressID, tags)
+			_, err := tyk.CreateService(opts)
 			if err != nil {
 				log.Error(err)
 			} else {
 				// remember we processed this
-				opLog.Store("add-"+ingressID, struct{}{})
+				opLog.Store("add-"+opts.Slug, struct{}{})
 			}
 		}
 	}
@@ -188,15 +192,35 @@ func (c *ControlServer) handleIngressUpdate(oldObj interface{}, newObj interface
 		return
 	}
 
-	err := c.doDelete(oldIng)
+	tags := []string{"ingress"}
+	hName := ""
+	createOrUpdateList := map[string]*tyk.APIDefOptions{}
+
+	for _, r0 := range newIng.Spec.Rules {
+		hName = r0.Host
+
+		for _, p := range r0.HTTP.Paths {
+			opts := &tyk.APIDefOptions{}
+			opts.ListenPath = p.Path
+			svcN := p.Backend.ServiceName
+			svcP := p.Backend.ServicePort.IntVal
+			opts.Name = getAPIName(newIng.Name, svcN)
+			opts.Target = fmt.Sprintf("http://%s.%s:%d", svcN, newIng.Namespace, svcP)
+			opts.Slug = generateIngressID(newIng.Name, newIng.Namespace, p)
+			opts.TemplateName = tyk.DefaultTemplate
+			opts.Hostname = hName
+			opts.Tags = tags
+
+			createOrUpdateList[opts.Slug] = opts
+		}
+	}
+
+	err := tyk.UpdateAPIs(createOrUpdateList)
 	if err != nil {
 		log.Error(err)
 	}
 
-	err = doAdd(newIng)
-	if err != nil {
-		log.Error(err)
-	}
+	return
 
 }
 

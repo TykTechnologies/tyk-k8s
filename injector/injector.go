@@ -202,7 +202,17 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string) (map[st
 	hName := fmt.Sprintf("%s.%s", sName, ns)
 	slugID := sName + "-inbound"
 	// inbound listener
-	inboundID, err := tyk.CreateService(slugID, "http://localhost:6767", "/", tyk.DefaultTemplate, hName, slugID, []string{meshTag, sName})
+	opts := &tyk.APIDefOptions{
+		Slug:         slugID,
+		Target:       "http://localhost:6767",
+		ListenPath:   "/",
+		TemplateName: tyk.DefaultTemplate,
+		Hostname:     hName,
+		Name:         slugID,
+		Tags:         []string{meshTag, sName},
+	}
+
+	inboundID, err := tyk.CreateService(opts)
 	if err != nil {
 		return annotations, fmt.Errorf("failed to create inbound service %v: %v", slugID, err.Error())
 	}
@@ -219,7 +229,17 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string) (map[st
 	}
 
 	meshSlugID := sName + "-mesh"
-	meshID, err := tyk.CreateService(meshSlugID, tgt, listenPath, tyk.DefaultTemplate, "", meshSlugID, []string{meshTag})
+	meshOpts := &tyk.APIDefOptions{
+		Slug:         meshSlugID,
+		Target:       tgt,
+		ListenPath:   listenPath,
+		TemplateName: tyk.DefaultTemplate,
+		Hostname:     "",
+		Name:         meshSlugID,
+		Tags:         []string{meshTag},
+	}
+
+	meshID, err := tyk.CreateService(meshOpts)
 	if err != nil {
 		return annotations, fmt.Errorf("failed to create mesh service %v: %v", meshSlugID, err.Error())
 	}
