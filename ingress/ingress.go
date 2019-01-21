@@ -116,8 +116,7 @@ func generateIngressID(ingressName, ns string, p v1beta1.HTTPIngressPath) string
 func doAdd(ing *v1beta1.Ingress) error {
 	tags := []string{"ingress"}
 	hName := ""
-	if len(ing.Spec.Rules) > 0 {
-		r0 := ing.Spec.Rules[0]
+	for _, r0 := range ing.Spec.Rules {
 		hName = r0.Host
 
 		for _, p := range r0.HTTP.Paths {
@@ -224,9 +223,7 @@ func (c *ControlServer) ingressChanged(old *v1beta1.Ingress, new *v1beta1.Ingres
 }
 
 func (c *ControlServer) doDelete(oldIng *v1beta1.Ingress) error {
-	if len(oldIng.Spec.Rules) > 0 {
-		r0 := oldIng.Spec.Rules[0]
-
+	for _, r0 := range oldIng.Spec.Rules {
 		for _, p := range r0.HTTP.Paths {
 			sid := generateIngressID(oldIng.Name, oldIng.Namespace, p)
 			err := tyk.DeleteBySlug(sid)

@@ -122,7 +122,26 @@ func DeleteBySlug(slug string) error {
 		}
 	}
 
-	return fmt.Errorf("Service with name %s not found for removal, remove manually", slug)
+	return fmt.Errorf("service with name %s not found for removal, remove manually", slug)
+}
+
+func GetBySlug(slug string) (*dashboard.DBApiDefinition, error) {
+	cl := newClient()
+
+	allServices, err := cl.FetchAPIs()
+	if err != nil {
+		return nil, err
+	}
+
+	cSlug := cleanSlug(slug)
+	for _, s := range allServices {
+		if cSlug == s.Slug {
+			log.Warning("found API entry, deleting: ", s.Id.Hex())
+			return &s, nil
+		}
+	}
+
+	return nil, fmt.Errorf("service with name %s not found", slug)
 }
 
 var defaultAPITemplate = `
