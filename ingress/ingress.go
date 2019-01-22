@@ -34,11 +34,12 @@ const (
 )
 
 type ControlServer struct {
-	cfg        *Config
-	client     *kubernetes.Clientset
-	store      cache.Store
-	controller cache.Controller
-	stopCh     chan struct{}
+	cfg               *Config
+	client            *kubernetes.Clientset
+	store             cache.Store
+	ingressController cache.Controller
+	podController     cache.Controller
+	stopCh            chan struct{}
 }
 
 func NewController() *ControlServer {
@@ -84,6 +85,7 @@ func (c *ControlServer) Start() error {
 	}
 
 	c.watchIngresses()
+	c.watchPods()
 	return nil
 }
 
@@ -296,7 +298,7 @@ func (c *ControlServer) checkIngressManaged(ing *v1beta1.Ingress) bool {
 func (c *ControlServer) watchIngresses() {
 	watchList := cache.NewListWatchFromClient(c.client.ExtensionsV1beta1().RESTClient(), "ingresses", v1.NamespaceAll,
 		fields.Everything())
-	c.store, c.controller = cache.NewInformer(
+	c.store, c.ingressController = cache.NewInformer(
 		watchList,
 		&v1beta1.Ingress{},
 		time.Second*10,
@@ -308,13 +310,13 @@ func (c *ControlServer) watchIngresses() {
 	)
 
 	c.stopCh = make(chan struct{})
-	go c.controller.Run(c.stopCh)
+	go c.ingressController.Run(c.stopCh)
 }
 
 func (c *ControlServer) watchPods() {
-	watchList := cache.NewListWatchFromClient(c.client.ExtensionsV1beta1().RESTClient(), "pods", v1.NamespaceAll,
+	watchList := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "pods", v1.NamespaceAll,
 		fields.Everything())
-	c.store, c.controller = cache.NewInformer(
+	c.store, c.podController = cache.NewInformer(
 		watchList,
 		&v1.Pod{},
 		time.Second*10,
@@ -324,7 +326,7 @@ func (c *ControlServer) watchPods() {
 	)
 
 	c.stopCh = make(chan struct{})
-	go c.controller.Run(c.stopCh)
+	go c.podController.Run(c.stopCh)
 }
 
 func (c *ControlServer) handlePodDelete(obj interface{}) {

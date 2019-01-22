@@ -18,11 +18,7 @@ var log = logger.GetLogger("main")
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "starts the controller",
-	Long: `Starts the controller with the specified modules as arguments,
-e.g. tyk-k8s start ingress injector.
-
-Each argument starts a different module and operation for the controller, 
-the above example starts the sidecar injector and the tyk k8s ingress controller.`,
+	Long:  `Starts the controller.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		sConf := &webserver.Config{}
 		err := viper.UnmarshalKey("Server", sConf)
@@ -30,36 +26,27 @@ the above example starts the sidecar injector and the tyk k8s ingress controller
 			log.Fatalf("no Server entry found in config file: %v", err)
 		}
 
-		// init config for the server
+		// Web server mutating webhook
 		webserver.Server().Config(sConf)
-		ingressStarted := false
-		for _, a := range args {
-			switch a {
-			case "inject", "injector", "sidecar":
-				whConf := &injector.Config{}
-				err := viper.UnmarshalKey("Injector", whConf)
-				if err != nil {
-					log.Fatalf("couldn't read injector config: %v", err)
-				}
-				whs := &injector.WebhookServer{
-					SidecarConfig: whConf,
-				}
-
-				webserver.Server().AddRoute("POST", "/inject", whs.Serve)
-			case "ingress", "ing":
-				ingressStarted = true
-				ingress.NewController()
-				err := ingress.Controller().Start()
-				if err != nil {
-					log.Fatal(err)
-				}
-				log.Info("ingress controller started")
-			default:
-				log.Error("use arguments like 'inject' or 'ingress' to start services")
-				return
-
-			}
+		whConf := &injector.Config{}
+		err = viper.UnmarshalKey("Injector", whConf)
+		if err != nil {
+			log.Fatalf("couldn't read injector config: %v", err)
 		}
+
+		whs := &injector.WebhookServer{
+			SidecarConfig: whConf,
+		}
+
+		webserver.Server().AddRoute("POST", "/inject", whs.Serve)
+
+		// Ingress controller
+		ingress.NewController()
+		err = ingress.Controller().Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Info("ingress controller started")
 
 		go webserver.Server().Start()
 		log.Info("web server started")
@@ -71,12 +58,11 @@ the above example starts the sidecar injector and the tyk k8s ingress controller
 			log.Error(err)
 		}
 
-		if ingressStarted {
-			err = ingress.Controller().Stop()
-			if err != nil {
-				log.Error(err)
-			}
+		err = ingress.Controller().Stop()
+		if err != nil {
+			log.Error(err)
 		}
+
 	},
 }
 
