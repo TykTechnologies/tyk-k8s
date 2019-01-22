@@ -34,6 +34,12 @@
 			"revisionTime": "2019-01-20T03:13:35Z"
 		},
 		{
+			"checksumSHA1": "KsVWiA/aZa1xyS3qI1Fs6zlw3Bs=",
+			"path": "github.com/TykTechnologies/tyk-k8s",
+			"revision": "e228dcebed616273f49bcbebe2db50b554d7b674",
+			"revisionTime": "2019-01-22T06:37:56Z"
+		},
+		{
 			"checksumSHA1": "IqdnQnnRw5z7SIzhp+sleq3vHR0=",
 			"origin": "github.com/TykTechnologies/tyk-git/vendor/github.com/TykTechnologies/tyk/apidef",
 			"path": "github.com/TykTechnologies/tyk/apidef",
