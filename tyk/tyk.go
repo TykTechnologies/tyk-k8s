@@ -54,7 +54,12 @@ const (
 	DefaultTemplate = "default"
 )
 
-func Init() {
+func Init(forceConf *TykConf) {
+	if forceConf != nil {
+		cfg = forceConf
+		return
+	}
+
 	if cfg == nil {
 		cfg = &TykConf{}
 		err := viper.UnmarshalKey("Tyk", cfg)
@@ -244,7 +249,6 @@ func GetBySlug(slug string) (*dashboard.DBApiDefinition, error) {
 	cSlug := cleanSlug(slug)
 	for _, s := range allServices {
 		if cSlug == s.Slug {
-			log.Warning("found API entry, deleting: ", s.Id.Hex())
 			return &s, nil
 		}
 	}

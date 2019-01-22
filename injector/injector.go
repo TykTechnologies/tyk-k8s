@@ -34,7 +34,7 @@ var ignoredNamespaces = []string{
 
 const (
 	AdmissionWebhookAnnotationInjectKey           = "injector.tyk.io/inject"
-	admissionWebhookAnnotationStatusKey           = "injector.tyk.io/status"
+	AdmissionWebhookAnnotationStatusKey           = "injector.tyk.io/status"
 	admissionWebhookAnnotationRouteKey            = "injector.tyk.io/route"
 	AdmissionWebhookAnnotationInboundServiceIDKey = "injector.tyk.io/inbound-service-id"
 	AdmissionWebhookAnnotationMeshServiceIDKey    = "injector.tyk.io/mesh-service-id"
@@ -93,7 +93,7 @@ func mutationRequired(ignoredList []string, metadata *metav1.ObjectMeta) bool {
 		annotations = map[string]string{}
 	}
 
-	status := annotations[admissionWebhookAnnotationStatusKey]
+	status := annotations[AdmissionWebhookAnnotationStatusKey]
 
 	// determine whether to perform mutation based on annotation for the target resource
 	var required bool
@@ -134,24 +134,16 @@ func addContainer(target, added []corev1.Container, basePath string) (patch []pa
 }
 
 func updateAnnotation(target map[string]string, added map[string]string) (patch []patchOperation) {
-	for key, value := range added {
-		if target == nil || target[key] == "" {
-			target = map[string]string{}
-			patch = append(patch, patchOperation{
-				Op:   "add",
-				Path: "/metadata/annotations",
-				Value: map[string]string{
-					key: value,
-				},
-			})
-		} else {
-			patch = append(patch, patchOperation{
-				Op:    "replace",
-				Path:  "/metadata/annotations/" + key,
-				Value: value,
-			})
-		}
+	if target == nil {
+		target = map[string]string{}
 	}
+
+	patch = append(patch, patchOperation{
+		Op:    "add",
+		Path:  "/metadata/annotations",
+		Value: added,
+	})
+
 	return patch
 }
 
@@ -212,12 +204,21 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string) (map[st
 		Tags:         []string{meshTag, sName},
 	}
 
-	inboundID, err := tyk.CreateService(opts)
-	if err != nil {
-		return annotations, fmt.Errorf("failed to create inbound service %v: %v", slugID, err.Error())
+	ibID := ""
+	inboundDef, doNotSkip := tyk.GetBySlug(opts.Slug)
+	if doNotSkip != nil {
+		// error means this service hasn't been created yet
+		inboundID, err := tyk.CreateService(opts)
+		if err != nil {
+			return annotations, fmt.Errorf("failed to create inbound service %v: %v", slugID, err.Error())
+		}
+
+		ibID = inboundID
+	} else {
+		ibID = inboundDef.Id.Hex()
 	}
 
-	annotations[AdmissionWebhookAnnotationInboundServiceIDKey] = inboundID
+	annotations[AdmissionWebhookAnnotationInboundServiceIDKey] = ibID
 
 	// mesh route
 	tgt := fmt.Sprintf("http://%s", hName)
@@ -228,6 +229,7 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string) (map[st
 		}
 	}
 
+	meshID := ""
 	meshSlugID := sName + "-mesh"
 	meshOpts := &tyk.APIDefOptions{
 		Slug:         meshSlugID,
@@ -239,9 +241,16 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string) (map[st
 		Tags:         []string{meshTag},
 	}
 
-	meshID, err := tyk.CreateService(meshOpts)
-	if err != nil {
-		return annotations, fmt.Errorf("failed to create mesh service %v: %v", meshSlugID, err.Error())
+	meshDef, doNotSkipMesh := tyk.GetBySlug(meshOpts.Slug)
+	if doNotSkipMesh != nil {
+		// error means this service hasn't been created yet
+		mId, err := tyk.CreateService(meshOpts)
+		if err != nil {
+			return annotations, fmt.Errorf("failed to create mesh service %v: %v", meshSlugID, err.Error())
+		}
+		meshID = mId
+	} else {
+		meshID = meshDef.Id.Hex()
 	}
 
 	annotations[AdmissionWebhookAnnotationMeshServiceIDKey] = meshID
@@ -273,7 +282,7 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 		}
 	}
 
-	annotations := map[string]string{admissionWebhookAnnotationStatusKey: "injected"}
+	annotations := map[string]string{AdmissionWebhookAnnotationStatusKey: "injected"}
 
 	// We create the service routes first, because we need the IDs
 	if whsvr.SidecarConfig.CreateRoutes {

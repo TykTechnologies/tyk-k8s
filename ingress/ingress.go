@@ -296,6 +296,7 @@ func (c *ControlServer) checkIngressManaged(ing *v1beta1.Ingress) bool {
 }
 
 func (c *ControlServer) watchIngresses() {
+	log.Info("Watching for ingress activity")
 	watchList := cache.NewListWatchFromClient(c.client.ExtensionsV1beta1().RESTClient(), "ingresses", v1.NamespaceAll,
 		fields.Everything())
 	c.store, c.ingressController = cache.NewInformer(
@@ -314,6 +315,7 @@ func (c *ControlServer) watchIngresses() {
 }
 
 func (c *ControlServer) watchPods() {
+	log.Info("Watching for pod deletion")
 	watchList := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "pods", v1.NamespaceAll,
 		fields.Everything())
 	c.store, c.podController = cache.NewInformer(
@@ -331,26 +333,38 @@ func (c *ControlServer) watchPods() {
 
 func (c *ControlServer) handlePodDelete(obj interface{}) {
 	pd, ok := obj.(*v1.Pod)
+	log.Info("detected pod deletion:  ", pd.Name)
+	log.Info(pd.Annotations)
 	if !ok {
 		log.Errorf("type not allowed for RS watcher: %v", reflect.TypeOf(obj))
 		return
 	}
 
-	_, proc := pd.Annotations[injector.AdmissionWebhookAnnotationInjectKey]
+	v, proc := pd.Annotations[injector.AdmissionWebhookAnnotationStatusKey]
 	if !proc {
 		return
 	}
+
+	if v != "injected" {
+		return
+	}
+
+	log.Info("pod is injector-managed")
 
 	remPds, err := c.client.CoreV1().Pods(pd.Namespace).List(v12.ListOptions{})
 	if err != nil {
 		log.Error(err)
 	}
+	log.Info("found ", len(remPds.Items), " in namespace")
 
 	rem := false
 	for _, pds := range remPds.Items {
-		_, rem = pds.Annotations[injector.AdmissionWebhookAnnotationInjectKey]
+		v, rem = pds.Annotations[injector.AdmissionWebhookAnnotationStatusKey]
 		if rem {
-			return
+			if v == "injected" {
+				log.Info("still pods remaining, not deleting routes")
+				return
+			}
 		}
 	}
 
@@ -367,6 +381,7 @@ func (c *ControlServer) handlePodDelete(obj interface{}) {
 		return
 	}
 
+	log.Info("deleting...")
 	err = tyk.DeleteByID(serviceID)
 	if err != nil {
 		log.Error("failed to remove service API: ", err)

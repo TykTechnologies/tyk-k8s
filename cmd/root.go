@@ -67,5 +67,5 @@ func initConfig() {
 	}
 
 	log.Infof("Using config file: %v", viper.ConfigFileUsed())
-	tyk.Init()
+	tyk.Init(nil)
 }

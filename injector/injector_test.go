@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/TykTechnologies/tyk-k8s/tyk"
+	"github.com/TykTechnologies/tykctl/api/_test_util"
 	"github.com/ghodss/yaml"
 	"io/ioutil"
 	"net/http/httptest"
@@ -23,6 +25,10 @@ func TestWebhookServer_Serve(t *testing.T) {
 	whs := WebhookServer{
 		SidecarConfig: cfg,
 	}
+
+	svr := _test_util.DashServerMock{}
+	svr.Start(":8989")
+	defer svr.Stop()
 
 	scenarios := []struct {
 		Payload      string
@@ -54,6 +60,13 @@ func TestWebhookServer_Serve(t *testing.T) {
 		req := httptest.NewRequest("POST", "http://localhost:9797/inject", bytes.NewReader([]byte(sc.Payload)))
 		req.Header.Add("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
+
+		whs.SidecarConfig.CreateRoutes = true
+		tyk.Init(&tyk.TykConf{
+			URL:    "http://localhost:8989",
+			Secret: "foo",
+			OrgID:  "1",
+		})
 
 		whs.Serve(rec, req)
 
