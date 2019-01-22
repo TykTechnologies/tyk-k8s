@@ -3,6 +3,7 @@ package webserver
 import (
 	"net/http"
 	"testing"
+	"time"
 )
 
 func TestServer(t *testing.T) {
@@ -12,6 +13,7 @@ func TestServer(t *testing.T) {
 	})
 
 	go Server().Start()
+	time.Sleep(1 * time.Second)
 
 	res, err := http.Get("http://localhost:9797/hello")
 	if err != nil {
