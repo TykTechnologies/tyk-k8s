@@ -65,7 +65,7 @@ func TestWebhookServer_Serve(t *testing.T) {
 		tyk.Init(&tyk.TykConf{
 			URL:    "http://localhost:8989",
 			Secret: "foo",
-			OrgID:  "1",
+			Org:    "1",
 		})
 
 		whs.Serve(rec, req)

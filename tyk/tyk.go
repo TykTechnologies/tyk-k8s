@@ -31,7 +31,7 @@ func cleanSlug(s string) string {
 type TykConf struct {
 	URL    string `yaml:"url"`
 	Secret string `yaml:"secret"`
-	OrgID  string `yaml:"org_id"`
+	Org    string `yaml:"org"`
 }
 
 type APIDefOptions struct {
@@ -96,7 +96,7 @@ func TemplateService(opts *APIDefOptions) ([]byte, error) {
 	tplVars := map[string]interface{}{
 		"Name":        opts.Name,
 		"Slug":        cleanSlug(opts.Slug),
-		"OrgID":       cfg.OrgID,
+		"Org":         cfg.Org,
 		"ListenPath":  opts.ListenPath,
 		"Target":      opts.Target,
 		"GatewayTags": opts.Tags,
@@ -265,7 +265,7 @@ var defaultAPITemplate = `
 {
     "name": "{{.Name}}{{ range $i, $e := .GatewayTags }} #{{$e}}{{ end }}",
 	"slug": "{{.Slug}}",
-    "org_id": "{{.OrgID}}",
+    "org_id": "{{.Org}}",
     "use_keyless": true,
     "definition": {
         "location": "header",
