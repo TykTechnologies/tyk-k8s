@@ -23,6 +23,7 @@ var log = logger.GetLogger("processor")
 
 func set(key, val, def string, t ValueType) (string, error) {
 	pth := key[len(string(t)):]
+	pth = strings.Replace(pth, "-", "_", -1)
 
 	switch t {
 	case ValueSetStringKey:
