@@ -71,10 +71,10 @@ var js = `
 
 func TestProc(t *testing.T) {
 	testAnnotations := map[string]string{
-		"service.tyk.io/bool/use-keyless":                                    "false",
-		"service.tyk.io/string/proxy.target-url":                             "http://foo.bar/bazington",
-		"service.tyk.io/num/cache_options.cache-timeout":                     "20",
-		"service.tyk.io/object/version_data.versions.Default.extended-paths": `{"hard_timeouts":[{"path":"{all}","method":"GET","timeout":60,"fromDashboard":true}]}`,
+		"bool.service.tyk.io/use-keyless":                                    "false",
+		"string.service.tyk.io/proxy.target-url":                             "http://foo.bar/bazington",
+		"num.service.tyk.io/cache_options.cache-timeout":                     "20",
+		"object.service.tyk.io/version_data.versions.Default.extended-paths": `{"hard_timeouts":[{"path":"{all}","method":"GET","timeout":60,"fromDashboard":true}]}`,
 	}
 
 	def, err := Process(testAnnotations, js)

@@ -12,11 +12,11 @@ import (
 type ValueType string
 
 const (
-	ValueSetStringKey ValueType = "service.tyk.io/string/"
-	ValueSetBoolKey   ValueType = "service.tyk.io/bool/"
-	ValueSetNumKey    ValueType = "service.tyk.io/num/"
-	ObjectSetKey      ValueType = "service.tyk.io/object/"
-	ArraySetKey       ValueType = "service.tyk.io/array/"
+	ValueSetStringKey ValueType = "string.service.tyk.io/"
+	ValueSetBoolKey   ValueType = "bool.service.tyk.io/"
+	ValueSetNumKey    ValueType = "num.service.tyk.io/"
+	ObjectSetKey      ValueType = "object.service.tyk.io/"
+	ArraySetKey       ValueType = "array.service.tyk.io/"
 )
 
 var log = logger.GetLogger("processor")
