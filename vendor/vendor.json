@@ -439,6 +439,12 @@
 			"revisionTime": "2019-01-14T15:40:04Z"
 		},
 		{
+			"checksumSHA1": "8jl+NYRKijAXkUwjpy89Q60q00A=",
+			"path": "github.com/tidwall/match",
+			"revision": "33827db735fff6510490d69a8622612558a557ed",
+			"revisionTime": "2018-12-10T10:08:38Z"
+		},
+		{
 			"checksumSHA1": "C/Ci5NUL8bfasMqre8HudmY+aTc=",
 			"path": "github.com/tidwall/sjson",
 			"revision": "c943cc8c8d751d9b33444adf78ae04c2fc8be754",
