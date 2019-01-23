@@ -8,6 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk-git/clients/dashboard"
 	"github.com/TykTechnologies/tyk-git/clients/objects"
 	"github.com/TykTechnologies/tyk-k8s/logger"
+	"github.com/TykTechnologies/tyk-k8s/processor"
 	"github.com/spf13/viper"
 	"regexp"
 	"strings"
@@ -45,6 +46,7 @@ type APIDefOptions struct {
 	APIID        string
 	ID           string
 	LegacyAPIDef *dashboard.DBApiDefinition
+	Annotations  map[string]string
 }
 
 var cfg *TykConf
@@ -119,8 +121,16 @@ func CreateService(opts *APIDefOptions) (string, error) {
 		return "", err
 	}
 
+	postProcessedDef := string(adBytes)
+	if opts.Annotations != nil {
+		postProcessedDef, err = processor.Process(opts.Annotations, string(adBytes))
+		if err != nil {
+			return "", err
+		}
+	}
+
 	apiDef := objects.NewDefinition()
-	err = json.Unmarshal(adBytes, apiDef)
+	err = json.Unmarshal([]byte(postProcessedDef), apiDef)
 	if err != nil {
 		return "", err
 	}

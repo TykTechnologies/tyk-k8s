@@ -134,6 +134,7 @@ func doAdd(ing *v1beta1.Ingress) error {
 			opts.TemplateName = tyk.DefaultTemplate
 			opts.Hostname = hName
 			opts.Tags = tags
+			opts.Annotations = ing.Annotations
 
 			_, ok := opLog.Load("add" + opts.Slug)
 			if ok {

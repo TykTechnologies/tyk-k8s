@@ -202,6 +202,7 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string) (map[st
 		Hostname:     hName,
 		Name:         slugID,
 		Tags:         []string{meshTag, sName},
+		Annotations:  annotations,
 	}
 
 	ibID := ""
@@ -282,7 +283,9 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 		}
 	}
 
-	annotations := map[string]string{AdmissionWebhookAnnotationStatusKey: "injected"}
+	annotations := pod.Annotations
+	annotations[AdmissionWebhookAnnotationStatusKey] = "injected"
+	delete(annotations, AdmissionWebhookAnnotationInjectKey)
 
 	// We create the service routes first, because we need the IDs
 	if whsvr.SidecarConfig.CreateRoutes {
