@@ -433,6 +433,12 @@
 			"revisionTime": "2018-07-10T12:30:20Z"
 		},
 		{
+			"checksumSHA1": "C/Ci5NUL8bfasMqre8HudmY+aTc=",
+			"path": "github.com/tidwall/sjson",
+			"revision": "c943cc8c8d751d9b33444adf78ae04c2fc8be754",
+			"revisionTime": "2018-11-15T10:30:24Z"
+		},
+		{
 			"checksumSHA1": "zwn9FlzQzF6L5lEeoV2ejtoLkIw=",
 			"origin": "github.com/TykTechnologies/tyk-git/vendor/github.com/x-cray/logrus-prefixed-formatter",
 			"path": "github.com/x-cray/logrus-prefixed-formatter",
