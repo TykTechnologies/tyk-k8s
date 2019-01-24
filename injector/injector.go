@@ -184,6 +184,8 @@ func mutateService(svc *corev1.Service, basePath string) (patch []patchOperation
 }
 
 // add tags to the gateway container
+const tagVarName = "TYK_GW_DBAPPCONFOPTIONS_TAGS"
+
 func preProcessContainerTpl(pod *corev1.Pod, containers []corev1.Container) []corev1.Container {
 	sName, ok := pod.Labels["app"]
 	if !ok {
@@ -191,9 +193,21 @@ func preProcessContainerTpl(pod *corev1.Pod, containers []corev1.Container) []co
 	}
 
 	tags := fmt.Sprintf("mesh,%s", sName)
-
+	tagEnv := corev1.EnvVar{Name: tagVarName, Value: tags}
 	for i, cnt := range containers {
-		containers[i].Env = append(cnt.Env, corev1.EnvVar{Name: "TYK_GW_DBAPPCONFOPTIONS_TAGS", Value: tags})
+		if strings.ToLower(cnt.Name) == "tyk-mesh" {
+			for ei, envVal := range containers[i].Env {
+				if envVal.Name == tagVarName {
+					// update the existing variable
+					containers[i].Env[ei] = tagEnv
+					break
+				}
+			}
+
+			// no exiting var found, create
+			containers[i].Env = append(cnt.Env, corev1.EnvVar{Name: tagVarName, Value: tags})
+			break
+		}
 	}
 
 	return containers
