@@ -31,6 +31,7 @@ var opLog = sync.Map{}
 const (
 	IngressAnnotation      = "kubernetes.io/ingress.class"
 	IngressAnnotationValue = "tyk"
+	TemplateNameKey        = "template.service.tyk.io/"
 )
 
 type ControlServer struct {

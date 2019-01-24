@@ -3,6 +3,7 @@ package injector
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/TykTechnologies/tyk-k8s/logger"
 	"github.com/TykTechnologies/tyk-k8s/tyk"
@@ -175,18 +176,18 @@ func createPatch(pod *corev1.Pod, sidecarConfig *Config, annotations map[string]
 }
 
 // create service routes
-func createServiceRoutes(pod *corev1.Pod, annotations map[string]string) (map[string]string, error) {
+func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespace string) (map[string]string, error) {
 	_, idExists := annotations[AdmissionWebhookAnnotationInboundServiceIDKey]
 	if idExists {
 		return annotations, nil
 	}
 
-	sName := pod.Name
-	if sName == "" {
-		sName = pod.GenerateName
+	sName, ok := pod.Labels["app"]
+	if !ok {
+		return annotations, errors.New("app label is required")
 	}
 
-	ns := pod.Namespace
+	ns := namespace
 	if ns == "" {
 		ns = "default"
 	}
@@ -290,7 +291,7 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 	// We create the service routes first, because we need the IDs
 	if whsvr.SidecarConfig.CreateRoutes {
 		var err error
-		annotations, err = createServiceRoutes(&pod, annotations)
+		annotations, err = createServiceRoutes(&pod, annotations, ar.Request.Namespace)
 		if err != nil {
 			return &v1beta1.AdmissionResponse{
 				Result: &metav1.Status{

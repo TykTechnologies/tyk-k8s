@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk-k8s/logger"
 	"github.com/TykTechnologies/tyk-k8s/processor"
 	"github.com/spf13/viper"
+	"path"
 	"regexp"
 	"strings"
 	"text/template"
@@ -30,9 +31,10 @@ func cleanSlug(s string) string {
 }
 
 type TykConf struct {
-	URL    string `yaml:"url"`
-	Secret string `yaml:"secret"`
-	Org    string `yaml:"org"`
+	URL       string `yaml:"url"`
+	Secret    string `yaml:"secret"`
+	Org       string `yaml:"org"`
+	Templates string `yaml:"templates"`
 }
 
 type APIDefOptions struct {
@@ -51,6 +53,8 @@ type APIDefOptions struct {
 
 var cfg *TykConf
 var log = logger.GetLogger("tyk-api")
+var templates *template.Template
+var defaultTemplate *template.Template
 
 const (
 	DefaultTemplate = "default"
@@ -70,6 +74,11 @@ func Init(forceConf *TykConf) {
 		}
 	}
 
+	if cfg.Templates != "" {
+		templates = template.Must(template.ParseGlob(path.Join(cfg.Templates, "*")))
+		defaultTemplate = template.Must(template.New("default").Parse(defaultAPITemplate))
+	}
+
 }
 
 func newClient() *dashboard.Client {
@@ -81,18 +90,32 @@ func newClient() *dashboard.Client {
 	return cl
 }
 
-func getTemplate(name string) (string, error) {
-	return "", errors.New("not implemented")
+func getTemplate(name string) (*template.Template, error) {
+	if cfg.Templates == "" {
+		return defaultTemplate, errors.New("not enabled")
+	}
+
+	if templates == nil {
+		return defaultTemplate, errors.New("no templates loaded")
+	}
+
+	tpl := templates.Lookup(name)
+	if tpl == nil {
+		return defaultTemplate, errors.New("not found")
+	}
+
+	return tpl, nil
+
 }
 
 func TemplateService(opts *APIDefOptions) ([]byte, error) {
-	defTpl := defaultAPITemplate
-	if opts.TemplateName != DefaultTemplate {
-		var err error
-		defTpl, err = getTemplate(opts.TemplateName)
-		if err != nil {
-			return nil, err
-		}
+	if opts.TemplateName == "" {
+		opts.TemplateName = DefaultTemplate
+	}
+
+	defTpl, err := getTemplate(opts.TemplateName)
+	if err != nil {
+		return nil, err
 	}
 
 	tplVars := map[string]interface{}{
@@ -106,8 +129,7 @@ func TemplateService(opts *APIDefOptions) ([]byte, error) {
 	}
 
 	var apiDefStr bytes.Buffer
-	tpl := template.Must(template.New("inject").Parse(defTpl))
-	err := tpl.Execute(&apiDefStr, tplVars)
+	err = defTpl.Execute(&apiDefStr, tplVars)
 	if err != nil {
 		return nil, err
 	}
@@ -288,6 +310,9 @@ var defaultAPITemplate = `
             "Default": {
                 "name": "Default",
                 "use_extended_paths": true,
+				"global_headers": {
+                    "X-Request-ID": "$tyk_context.request_id"
+                },
 				"paths": {
                     "ignored": [],
                     "white_list": [],
