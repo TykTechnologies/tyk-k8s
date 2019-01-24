@@ -176,7 +176,7 @@ func createPatch(pod *corev1.Pod, sidecarConfig *Config, annotations map[string]
 }
 
 // create service routes
-func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespace string) (map[string]string, error) {
+func createServiceRoutes(pod *corev1.Pod, service *corev1.Service, annotations map[string]string, namespace string) (map[string]string, error) {
 	_, idExists := annotations[AdmissionWebhookAnnotationInboundServiceIDKey]
 	if idExists {
 		return annotations, nil
@@ -202,7 +202,7 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespa
 		TemplateName: tyk.DefaultTemplate,
 		Hostname:     hName,
 		Name:         slugID,
-		Tags:         []string{meshTag, sName},
+		Tags:         []string{sName},
 		Annotations:  annotations,
 	}
 
@@ -223,7 +223,15 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespa
 	annotations[AdmissionWebhookAnnotationInboundServiceIDKey] = ibID
 
 	// mesh route
-	tgt := fmt.Sprintf("http://%s", hName)
+	var pt int32
+	pt = 8080
+	if service != nil {
+		if len(service.Spec.Ports) > 0 {
+			pt = service.Spec.Ports[0].Port
+		}
+	}
+
+	tgt := fmt.Sprintf("http://%s:%d", hName, pt)
 	listenPath := sName
 	for k, v := range pod.Annotations {
 		if k == admissionWebhookAnnotationRouteKey {
@@ -273,6 +281,12 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 		}
 	}
 
+	// TODO: services should use non-standard ports
+	svc := &corev1.Service{}
+	if err := json.Unmarshal(req.Object.Raw, svc); err != nil {
+		log.Warning("no service found in admission object")
+	}
+
 	log.Infof("AdmissionReview for Kind=%v, Namespace=%v Name=%v (%v) UID=%v patchOperation=%v UserInfo=%v",
 		req.Kind, req.Namespace, req.Name, pod.Name, req.UID, req.Operation, req.UserInfo)
 
@@ -291,7 +305,7 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 	// We create the service routes first, because we need the IDs
 	if whsvr.SidecarConfig.CreateRoutes {
 		var err error
-		annotations, err = createServiceRoutes(&pod, annotations, ar.Request.Namespace)
+		annotations, err = createServiceRoutes(&pod, svc, annotations, ar.Request.Namespace)
 		if err != nil {
 			return &v1beta1.AdmissionResponse{
 				Result: &metav1.Status{
