@@ -54,6 +54,14 @@ type Config struct {
 	CreateRoutes   bool               `yaml:"createRoutes"`
 }
 
+type namedThing struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+}
+
 type patchOperation struct {
 	Op    string      `json:"op"`
 	Path  string      `json:"path"`
@@ -197,7 +205,9 @@ func createPatch(pod *corev1.Pod, svc *corev1.Service, sidecarConfig *Config, an
 
 	if svc != nil {
 		patch = append(patch, mutateService(svc, "/spec/ports")...)
+		return json.Marshal(patch)
 	}
+
 	patch = append(patch, addContainer(pod.Spec.Containers, preProcessContainerTpl(pod, sidecarConfig.Containers), "/spec/containers")...)
 	patch = append(patch, addContainer(pod.Spec.InitContainers, sidecarConfig.InitContainers, "/spec/initContainers")...)
 	patch = append(patch, updateAnnotation(pod.Annotations, annotations)...)
@@ -205,7 +215,7 @@ func createPatch(pod *corev1.Pod, svc *corev1.Service, sidecarConfig *Config, an
 }
 
 // create service routes
-func createServiceRoutes(pod *corev1.Pod, service *corev1.Service, annotations map[string]string, namespace string) (map[string]string, error) {
+func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespace string) (map[string]string, error) {
 	_, idExists := annotations[AdmissionWebhookAnnotationInboundServiceIDKey]
 	if idExists {
 		return annotations, nil
@@ -254,11 +264,6 @@ func createServiceRoutes(pod *corev1.Pod, service *corev1.Service, annotations m
 	// mesh route
 	var pt int32
 	pt = 8080
-	if service != nil {
-		if len(service.Spec.Ports) > 0 {
-			pt = service.Spec.Ports[0].Port
-		}
-	}
 
 	tgt := fmt.Sprintf("http://%s:%d", hName, pt)
 	listenPath := sName
@@ -297,8 +302,7 @@ func createServiceRoutes(pod *corev1.Pod, service *corev1.Service, annotations m
 	return annotations, nil
 }
 
-// main mutation process
-func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+func (whsvr *WebhookServer) processPodMutations(ar *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	req := ar.Request
 	var pod corev1.Pod
 	if err := json.Unmarshal(req.Object.Raw, &pod); err != nil {
@@ -308,12 +312,6 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 				Message: err.Error(),
 			},
 		}
-	}
-
-	// TODO: services should use non-standard ports
-	var svc corev1.Service
-	if err := json.Unmarshal(req.Object.Raw, &svc); err != nil {
-		log.Warning("no service found in admission object")
 	}
 
 	log.Infof("AdmissionReview for Kind=%v, Namespace=%v Name=%v (%v) UID=%v patchOperation=%v UserInfo=%v",
@@ -334,7 +332,7 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 	// We create the service routes first, because we need the IDs
 	if whsvr.SidecarConfig.CreateRoutes {
 		var err error
-		annotations, err = createServiceRoutes(&pod, &svc, annotations, ar.Request.Namespace)
+		annotations, err = createServiceRoutes(&pod, annotations, ar.Request.Namespace)
 		if err != nil {
 			return &v1beta1.AdmissionResponse{
 				Result: &metav1.Status{
@@ -345,7 +343,7 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 	}
 
 	// Create the patch
-	patchBytes, err := createPatch(&pod, &svc, whsvr.SidecarConfig, annotations)
+	patchBytes, err := createPatch(&pod, nil, whsvr.SidecarConfig, annotations)
 	if err != nil {
 		return &v1beta1.AdmissionResponse{
 			Result: &metav1.Status{
@@ -362,6 +360,73 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 			pt := v1beta1.PatchTypeJSONPatch
 			return &pt
 		}(),
+	}
+}
+
+func (whsvr *WebhookServer) processServiceMutations(ar *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	req := ar.Request
+	var service corev1.Service
+	if err := json.Unmarshal(req.Object.Raw, &service); err != nil {
+		log.Errorf("Could not unmarshal raw object: %v", err)
+		return &v1beta1.AdmissionResponse{
+			Result: &metav1.Status{
+				Message: err.Error(),
+			},
+		}
+	}
+
+	log.Infof("AdmissionReview for Kind=%v, Namespace=%v Name=%v (%v) UID=%v patchOperation=%v UserInfo=%v",
+		req.Kind, req.Namespace, req.Name, service.Name, req.UID, req.Operation, req.UserInfo)
+
+	// determine whether to perform mutation
+	if !mutationRequired(ignoredNamespaces, &service.ObjectMeta) {
+		log.Infof("Skipping mutation for %s/%s due to policy check", service.Namespace, service.Name)
+		return &v1beta1.AdmissionResponse{
+			Allowed: true,
+		}
+	}
+
+	annotations := service.Annotations
+	annotations[AdmissionWebhookAnnotationStatusKey] = "injected"
+	delete(annotations, AdmissionWebhookAnnotationInjectKey)
+
+	// Create the patch
+	patchBytes, err := createPatch(nil, &service, whsvr.SidecarConfig, annotations)
+	if err != nil {
+		return &v1beta1.AdmissionResponse{
+			Result: &metav1.Status{
+				Message: err.Error(),
+			},
+		}
+	}
+
+	log.Infof("AdmissionResponse: patch=%v\n", string(patchBytes))
+	return &v1beta1.AdmissionResponse{
+		Allowed: true,
+		Patch:   patchBytes,
+		PatchType: func() *v1beta1.PatchType {
+			pt := v1beta1.PatchTypeJSONPatch
+			return &pt
+		}(),
+	}
+}
+
+// main mutation process
+func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	req := ar.Request
+
+	log.Info("object is: ", req.Kind)
+	switch strings.ToLower(req.Kind.Kind) {
+	case "pod":
+		return whsvr.processPodMutations(ar)
+	case "service":
+		return whsvr.processServiceMutations(ar)
+	default:
+		return &v1beta1.AdmissionResponse{
+			Result: &metav1.Status{
+				Message: "type not supported",
+			},
+		}
 	}
 }
 
