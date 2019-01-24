@@ -186,6 +186,7 @@ func mutateService(svc *corev1.Service, basePath string) (patch []patchOperation
 // add tags to the gateway container
 const tagVarName = "TYK_GW_DBAPPCONFOPTIONS_TAGS"
 
+// TODO: For some reason this starts appending the same (or different) tags after multiple deployments
 func preProcessContainerTpl(pod *corev1.Pod, containers []corev1.Container) []corev1.Container {
 	sName, ok := pod.Labels["app"]
 	if !ok {
@@ -200,7 +201,7 @@ func preProcessContainerTpl(pod *corev1.Pod, containers []corev1.Container) []co
 				if envVal.Name == tagVarName {
 					// update the existing variable
 					containers[i].Env[ei] = tagEnv
-					break
+					return containers
 				}
 			}
 
