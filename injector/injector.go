@@ -8,6 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk-k8s/logger"
 	"github.com/TykTechnologies/tyk-k8s/tyk"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"net/http"
 	"strings"
 
@@ -148,11 +149,37 @@ func updateAnnotation(target map[string]string, added map[string]string) (patch 
 	return patch
 }
 
+func mutateService(svc *corev1.Service, basePath string) (patch []patchOperation) {
+
+	sidecarSvcPort := &corev1.ServicePort{
+		Name: "tyk-sidecar",
+		Port: 8080,
+		TargetPort: intstr.IntOrString{
+			IntVal: 8080,
+		},
+	}
+
+	opp := "replace"
+	path := "/spec/ports/0"
+	if len(svc.Spec.Ports) > 1 {
+		opp = "add"
+		path = "/spec/ports"
+	}
+
+	patch = append(patch, patchOperation{
+		Op:    opp,
+		Path:  path,
+		Value: sidecarSvcPort,
+	})
+
+	return patch
+}
+
 // add tags to the gateway container
 func preProcessContainerTpl(pod *corev1.Pod, containers []corev1.Container) []corev1.Container {
-	sName := pod.Name
-	if sName == "" {
-		sName = pod.GenerateName
+	sName, ok := pod.Labels["app"]
+	if !ok {
+		sName = pod.GenerateName + "please-set-app-label"
 	}
 
 	tags := fmt.Sprintf("mesh,%s", sName)
@@ -165,13 +192,15 @@ func preProcessContainerTpl(pod *corev1.Pod, containers []corev1.Container) []co
 }
 
 // create mutation patch for resoures
-func createPatch(pod *corev1.Pod, sidecarConfig *Config, annotations map[string]string) ([]byte, error) {
+func createPatch(pod *corev1.Pod, svc *corev1.Service, sidecarConfig *Config, annotations map[string]string) ([]byte, error) {
 	var patch []patchOperation
 
+	if svc != nil {
+		patch = append(patch, mutateService(svc, "/spec/ports")...)
+	}
 	patch = append(patch, addContainer(pod.Spec.Containers, preProcessContainerTpl(pod, sidecarConfig.Containers), "/spec/containers")...)
 	patch = append(patch, addContainer(pod.Spec.InitContainers, sidecarConfig.InitContainers, "/spec/initContainers")...)
 	patch = append(patch, updateAnnotation(pod.Annotations, annotations)...)
-
 	return json.Marshal(patch)
 }
 
@@ -282,8 +311,8 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 	}
 
 	// TODO: services should use non-standard ports
-	svc := &corev1.Service{}
-	if err := json.Unmarshal(req.Object.Raw, svc); err != nil {
+	var svc corev1.Service
+	if err := json.Unmarshal(req.Object.Raw, &svc); err != nil {
 		log.Warning("no service found in admission object")
 	}
 
@@ -305,7 +334,7 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 	// We create the service routes first, because we need the IDs
 	if whsvr.SidecarConfig.CreateRoutes {
 		var err error
-		annotations, err = createServiceRoutes(&pod, svc, annotations, ar.Request.Namespace)
+		annotations, err = createServiceRoutes(&pod, &svc, annotations, ar.Request.Namespace)
 		if err != nil {
 			return &v1beta1.AdmissionResponse{
 				Result: &metav1.Status{
@@ -316,7 +345,7 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 	}
 
 	// Create the patch
-	patchBytes, err := createPatch(&pod, whsvr.SidecarConfig, annotations)
+	patchBytes, err := createPatch(&pod, &svc, whsvr.SidecarConfig, annotations)
 	if err != nil {
 		return &v1beta1.AdmissionResponse{
 			Result: &metav1.Status{
