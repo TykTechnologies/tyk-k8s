@@ -61,6 +61,8 @@ const (
 )
 
 func Init(forceConf *TykConf) {
+	defaultTemplate = template.Must(template.New("default").Parse(defaultAPITemplate))
+
 	if forceConf != nil {
 		cfg = forceConf
 		return
@@ -76,7 +78,6 @@ func Init(forceConf *TykConf) {
 
 	if cfg.Templates != "" {
 		templates = template.Must(template.ParseGlob(path.Join(cfg.Templates, "*")))
-		defaultTemplate = template.Must(template.New("default").Parse(defaultAPITemplate))
 	}
 
 }
@@ -92,7 +93,8 @@ func newClient() *dashboard.Client {
 
 func getTemplate(name string) (*template.Template, error) {
 	if cfg.Templates == "" {
-		return defaultTemplate, errors.New("not enabled")
+		log.Warning("using default template")
+		return defaultTemplate, nil
 	}
 
 	if templates == nil {
