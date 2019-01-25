@@ -313,7 +313,7 @@ var defaultAPITemplate = `
                 "name": "Default",
                 "use_extended_paths": true,
 				"global_headers": {
-                    "X-Request-ID": "$tyk_context.request_id"
+                    "X-Tyk-Request-ID": "$tyk_context.request_id"
                 },
 				"paths": {
                     "ignored": [],
