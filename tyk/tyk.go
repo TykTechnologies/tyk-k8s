@@ -364,7 +364,7 @@ var defaultAPITemplate = `
     },
     "active": true,
     "tags": [{{ range $i, $e := .GatewayTags }}{{ if $i }},{{ end }}"{{ $e }}"{{ end }}],
-    "enable_context_vars": true
+    "enable_context_vars": true,
 	"certificates": [{{ range $i, $e := .CertificateID }}{{ if $i }},{{ end }}"{{ $e }}"{{ end }}]
 }
 `
