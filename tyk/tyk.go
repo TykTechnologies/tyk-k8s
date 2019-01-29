@@ -38,17 +38,18 @@ type TykConf struct {
 }
 
 type APIDefOptions struct {
-	Name         string
-	Target       string
-	ListenPath   string
-	TemplateName string
-	Hostname     string
-	Slug         string
-	Tags         []string
-	APIID        string
-	ID           string
-	LegacyAPIDef *dashboard.DBApiDefinition
-	Annotations  map[string]string
+	Name          string
+	Target        string
+	ListenPath    string
+	TemplateName  string
+	Hostname      string
+	Slug          string
+	Tags          []string
+	APIID         string
+	ID            string
+	LegacyAPIDef  *dashboard.DBApiDefinition
+	Annotations   map[string]string
+	CertificateID []string
 }
 
 var cfg *TykConf
@@ -137,6 +138,12 @@ func TemplateService(opts *APIDefOptions) ([]byte, error) {
 	}
 
 	return apiDefStr.Bytes(), nil
+}
+
+func CreateCertificate(cert []byte) (string, error) {
+	cl := newClient()
+
+	return cl.CreateCertificate(cert)
 }
 
 func CreateService(opts *APIDefOptions) (string, error) {
@@ -358,5 +365,6 @@ var defaultAPITemplate = `
     "active": true,
     "tags": [{{ range $i, $e := .GatewayTags }}{{ if $i }},{{ end }}"{{ $e }}"{{ end }}],
     "enable_context_vars": true
+	"certificates": [{{ range $i, $e := .CertificateID }}{{ if $i }},{{ end }}"{{ $e }}"{{ end }}]
 }
 `

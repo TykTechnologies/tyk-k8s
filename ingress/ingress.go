@@ -3,6 +3,7 @@ package ingress
 import (
 	"crypto/sha1"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"github.com/TykTechnologies/tyk-k8s/injector"
 	"github.com/TykTechnologies/tyk-k8s/logger"
@@ -103,13 +104,13 @@ func (c *ControlServer) Stop() error {
 	}
 }
 
-func getAPIName(name, service string) string {
+func (c *ControlServer) getAPIName(name, service string) string {
 	v := fmt.Sprintf("%s:%s", name, service)
 	log.Info("service name is: ", v)
 	return v
 }
 
-func generateIngressID(ingressName, ns string, p v1beta1.HTTPIngressPath) string {
+func (c *ControlServer) generateIngressID(ingressName, ns string, p v1beta1.HTTPIngressPath) string {
 	serviceFQDN := fmt.Sprintf("%s.%s.%s/%s", ingressName, ns, p.Backend.ServiceName, p.Path)
 	hasher := sha1.New()
 	hasher.Write([]byte(serviceFQDN))
@@ -118,24 +119,72 @@ func generateIngressID(ingressName, ns string, p v1beta1.HTTPIngressPath) string
 	return sha
 }
 
-func doAdd(ing *v1beta1.Ingress) error {
+func (c *ControlServer) handleTLS(ing *v1beta1.Ingress) (map[string]string, error) {
+	certMap := map[string]string{}
+	for _, iTLS := range ing.Spec.TLS {
+		sec, err := c.client.CoreV1().Secrets(ing.Namespace).Get(iTLS.SecretName, v12.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		crt, ok := sec.Data["tls.crt"]
+		if !ok {
+			return nil, errors.New("no certificate found")
+		}
+
+		key, ok := sec.Data["tls.key"]
+		if !ok {
+			return nil, errors.New("no key found")
+		}
+
+		combined := make([]byte, 0)
+		combined = append(combined, crt...)
+		combined = append(combined, key...)
+
+		id, err := tyk.CreateCertificate(combined)
+		if err != nil {
+			return nil, err
+		}
+
+		// map the certificate ID to all the host-names
+		for _, n := range iTLS.Hosts {
+			certMap[n] = id
+		}
+	}
+
+	return certMap, nil
+
+}
+
+func (c *ControlServer) doAdd(ing *v1beta1.Ingress) error {
 	tags := []string{"ingress"}
 	hName := ""
+
+	certs, err := c.handleTLS(ing)
+	if err != nil {
+		return err
+	}
+
 	for _, r0 := range ing.Spec.Rules {
 		hName = r0.Host
+		certID, addCert := certs[hName]
 
 		for _, p := range r0.HTTP.Paths {
 			opts := &tyk.APIDefOptions{}
 			opts.ListenPath = p.Path
 			svcN := p.Backend.ServiceName
 			svcP := p.Backend.ServicePort.IntVal
-			opts.Name = getAPIName(ing.Name, svcN)
+			opts.Name = c.getAPIName(ing.Name, svcN)
 			opts.Target = fmt.Sprintf("http://%s.%s:%d", svcN, ing.Namespace, svcP)
-			opts.Slug = generateIngressID(ing.Name, ing.Namespace, p)
+			opts.Slug = c.generateIngressID(ing.Name, ing.Namespace, p)
 			opts.TemplateName = tyk.DefaultTemplate
 			opts.Hostname = hName
 			opts.Tags = tags
 			opts.Annotations = ing.Annotations
+
+			if addCert {
+				opts.CertificateID = []string{certID}
+			}
 
 			_, ok := opLog.Load("add" + opts.Slug)
 			if ok {
@@ -167,7 +216,7 @@ func (c *ControlServer) handleIngressAdd(obj interface{}) {
 		return
 	}
 
-	err := doAdd(ing)
+	err := c.doAdd(ing)
 	if err != nil {
 		log.Error(err)
 	}
@@ -210,9 +259,9 @@ func (c *ControlServer) handleIngressUpdate(oldObj interface{}, newObj interface
 			opts.ListenPath = p.Path
 			svcN := p.Backend.ServiceName
 			svcP := p.Backend.ServicePort.IntVal
-			opts.Name = getAPIName(newIng.Name, svcN)
+			opts.Name = c.getAPIName(newIng.Name, svcN)
 			opts.Target = fmt.Sprintf("http://%s.%s:%d", svcN, newIng.Namespace, svcP)
-			opts.Slug = generateIngressID(newIng.Name, newIng.Namespace, p)
+			opts.Slug = c.generateIngressID(newIng.Name, newIng.Namespace, p)
 			opts.TemplateName = tyk.DefaultTemplate
 			opts.Hostname = hName
 			opts.Tags = tags
@@ -255,7 +304,7 @@ func (c *ControlServer) ingressChanged(old *v1beta1.Ingress, new *v1beta1.Ingres
 func (c *ControlServer) doDelete(oldIng *v1beta1.Ingress) error {
 	for _, r0 := range oldIng.Spec.Rules {
 		for _, p := range r0.HTTP.Paths {
-			sid := generateIngressID(oldIng.Name, oldIng.Namespace, p)
+			sid := c.generateIngressID(oldIng.Name, oldIng.Namespace, p)
 			err := tyk.DeleteBySlug(sid)
 			if err != nil {
 				log.Error(err)
