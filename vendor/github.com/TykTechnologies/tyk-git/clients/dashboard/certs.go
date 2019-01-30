@@ -2,38 +2,46 @@ package dashboard
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
-	"github.com/levigross/grequests"
 	"github.com/ongoingio/urljoin"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
+	"net/http"
 	"strings"
 )
 
 func (c *Client) CreateCertificate(cert []byte) (string, error) {
 	fullPath := urljoin.Join(c.url, endpointCerts)
 
-	ro := &grequests.RequestOptions{
-		Files: []grequests.FileUpload{
-			{
-				FileContents: ioutil.NopCloser(bytes.NewReader(cert)),
-			},
-		},
-		Headers: map[string]string{
-			"Authorization": c.secret,
-		},
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("cert", "cert.pem")
+	if err != nil {
+		return "", err
 	}
+	_, err = io.Copy(part, ioutil.NopCloser(bytes.NewReader(cert)))
 
-	resp, err := grequests.Post(fullPath, ro)
+	err = writer.Close()
 	if err != nil {
 		return "", err
 	}
 
+	req, err := http.NewRequest("POST", fullPath, body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", c.secret)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
+	rBody, _ := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("API Returned error: %v", resp.String())
+		return "", fmt.Errorf("API Returned error: %v", string(rBody))
 	}
 
 	dbResp := CertResponse{}
-	if err := resp.JSON(&dbResp); err != nil {
+	if err := json.Unmarshal(rBody, &dbResp); err != nil {
 		return "", err
 	}
 

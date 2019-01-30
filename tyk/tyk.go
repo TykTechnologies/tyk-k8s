@@ -122,13 +122,14 @@ func TemplateService(opts *APIDefOptions) ([]byte, error) {
 	}
 
 	tplVars := map[string]interface{}{
-		"Name":        opts.Name,
-		"Slug":        cleanSlug(opts.Slug),
-		"Org":         cfg.Org,
-		"ListenPath":  opts.ListenPath,
-		"Target":      opts.Target,
-		"GatewayTags": opts.Tags,
-		"HostName":    opts.Hostname,
+		"Name":          opts.Name,
+		"Slug":          cleanSlug(opts.Slug),
+		"Org":           cfg.Org,
+		"ListenPath":    opts.ListenPath,
+		"Target":        opts.Target,
+		"GatewayTags":   opts.Tags,
+		"HostName":      opts.Hostname,
+		"CertificateID": opts.CertificateID,
 	}
 
 	var apiDefStr bytes.Buffer
@@ -140,10 +141,28 @@ func TemplateService(opts *APIDefOptions) ([]byte, error) {
 	return apiDefStr.Bytes(), nil
 }
 
-func CreateCertificate(cert []byte) (string, error) {
+func CreateCertificate(crt, key []byte) (string, error) {
 	cl := newClient()
+	combined := make([]byte, 0)
+	combined = append(combined, crt...)
+	combined = append(combined, key...)
 
-	return cl.CreateCertificate(cert)
+	id, err := cl.CreateCertificate(combined)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "id already exists") {
+			rx := regexp.MustCompile("([a-f0-9]{10,})")
+			items := rx.FindAllString(err.Error(), 1)
+			if len(items) != 1 {
+				return "", errors.New("could not extract existing ID")
+			}
+
+			return items[0], nil
+		}
+
+		return "", err
+	}
+
+	return id, nil
 }
 
 func CreateService(opts *APIDefOptions) (string, error) {
@@ -153,6 +172,7 @@ func CreateService(opts *APIDefOptions) (string, error) {
 	}
 
 	postProcessedDef := string(adBytes)
+	log.Info(postProcessedDef)
 	if opts.Annotations != nil {
 		postProcessedDef, err = processor.Process(opts.Annotations, string(adBytes))
 		if err != nil {

@@ -28,7 +28,7 @@
 			"revisionTime": "2019-01-20T03:13:35Z"
 		},
 		{
-			"checksumSHA1": "I04j/BDtmrYEAoNNJdjqMllyVEQ=",
+			"checksumSHA1": "kyhKe4Xd7Z+OOH7XwTERZHonJio=",
 			"path": "github.com/TykTechnologies/tyk-git/clients/dashboard",
 			"revision": "a9b3ad87b336083b2d33b27e5571933d2755e12a",
 			"revisionTime": "2019-01-20T03:13:35Z"
@@ -46,7 +46,7 @@
 			"revisionTime": "2019-01-22T06:37:56Z"
 		},
 		{
-			"checksumSHA1": "IqdnQnnRw5z7SIzhp+sleq3vHR0=",
+			"checksumSHA1": "8isFGBofxsaVf2VK3YZUrdzkOAU=",
 			"origin": "github.com/TykTechnologies/tyk-git/vendor/github.com/TykTechnologies/tyk/apidef",
 			"path": "github.com/TykTechnologies/tyk/apidef",
 			"revision": "a9b3ad87b336083b2d33b27e5571933d2755e12a",

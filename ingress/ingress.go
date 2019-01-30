@@ -120,8 +120,10 @@ func (c *ControlServer) generateIngressID(ingressName, ns string, p v1beta1.HTTP
 }
 
 func (c *ControlServer) handleTLS(ing *v1beta1.Ingress) (map[string]string, error) {
+	log.Info("checking for TLS entries")
 	certMap := map[string]string{}
 	for _, iTLS := range ing.Spec.TLS {
+		log.Info("found TLS entry: ", iTLS.String())
 		sec, err := c.client.CoreV1().Secrets(ing.Namespace).Get(iTLS.SecretName, v12.GetOptions{})
 		if err != nil {
 			return nil, err
@@ -137,14 +139,12 @@ func (c *ControlServer) handleTLS(ing *v1beta1.Ingress) (map[string]string, erro
 			return nil, errors.New("no key found")
 		}
 
-		combined := make([]byte, 0)
-		combined = append(combined, crt...)
-		combined = append(combined, key...)
-
-		id, err := tyk.CreateCertificate(combined)
+		log.Info("creating certificate")
+		id, err := tyk.CreateCertificate(crt, key)
 		if err != nil {
 			return nil, err
 		}
+		log.Info("certificate created with ID: ", id)
 
 		// map the certificate ID to all the host-names
 		for _, n := range iTLS.Hosts {
@@ -168,6 +168,7 @@ func (c *ControlServer) doAdd(ing *v1beta1.Ingress) error {
 	for _, r0 := range ing.Spec.Rules {
 		hName = r0.Host
 		certID, addCert := certs[hName]
+		log.Info("checking if cert for host exists: ", r0.Host, ", (", addCert, ")")
 
 		for _, p := range r0.HTTP.Paths {
 			opts := &tyk.APIDefOptions{}
@@ -183,6 +184,7 @@ func (c *ControlServer) doAdd(ing *v1beta1.Ingress) error {
 			opts.Annotations = ing.Annotations
 
 			if addCert {
+				log.Info("injecting certificate ID")
 				opts.CertificateID = []string{certID}
 			}
 
