@@ -84,6 +84,10 @@ func Init(forceConf *TykConf) {
 		templates = template.Must(template.ParseGlob(path.Join(cfg.Templates, "*")))
 	}
 
+	if cfg.InsecureSkipVerify {
+		log.Warning("TLS is not being validated, please ensure certificates are valid")
+	}
+
 }
 
 func newClient() interfaces.UniversalClient {
