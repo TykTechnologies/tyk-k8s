@@ -612,8 +612,8 @@
 			"checksumSHA1": "8PDhPkU0sepu3Z1S6qp3CbXnPs0=",
 			"origin": "github.com/TykTechnologies/tyk-git/vendor/gopkg.in/mgo.v2/internal/json",
 			"path": "gopkg.in/mgo.v2/internal/json",
-			"revision": "a9b3ad87b336083b2d33b27e5571933d2755e12a",
-			"revisionTime": "2019-01-20T03:13:35Z"
+			"revision": "e52f64042920d055e54289d567cac2d20d28abff",
+			"revisionTime": "2019-04-16T04:24:54Z"
 		},
 		{
 			"checksumSHA1": "QqDq2x8XOU7IoOR98Cx1eiV5QY8=",
