@@ -22,28 +22,28 @@
 			"revisionTime": "2016-12-01T17:12:39Z"
 		},
 		{
-			"checksumSHA1": "AViKw+jrS/NVC4xpETx4gEaCYmI=",
+			"checksumSHA1": "SDqunyzgBT8+S3P1CxPZVkqc+yc=",
 			"path": "github.com/TykTechnologies/tyk-git/clients/dashboard",
-			"revision": "e52f64042920d055e54289d567cac2d20d28abff",
-			"revisionTime": "2019-04-16T04:24:54Z"
+			"revision": "ffede0580d7fafdce6286de4c7d620893e7b4775",
+			"revisionTime": "2019-04-16T10:18:16Z"
 		},
 		{
-			"checksumSHA1": "9lbNnN9y8Dd8IiF6p//2Pd81zmo=",
+			"checksumSHA1": "SsadFbjaSIRZrPEwHacd8sY++3o=",
 			"path": "github.com/TykTechnologies/tyk-git/clients/gateway",
-			"revision": "e52f64042920d055e54289d567cac2d20d28abff",
-			"revisionTime": "2019-04-16T04:24:54Z"
+			"revision": "ffede0580d7fafdce6286de4c7d620893e7b4775",
+			"revisionTime": "2019-04-16T10:18:16Z"
 		},
 		{
-			"checksumSHA1": "zvR6ABDBBBhc+lKyNptBJg1kkCE=",
+			"checksumSHA1": "x3wxEVHUO8DML7I7pzmzqk59VPc=",
 			"path": "github.com/TykTechnologies/tyk-git/clients/interfaces",
-			"revision": "e52f64042920d055e54289d567cac2d20d28abff",
-			"revisionTime": "2019-04-16T04:24:54Z"
+			"revision": "ffede0580d7fafdce6286de4c7d620893e7b4775",
+			"revisionTime": "2019-04-16T10:18:16Z"
 		},
 		{
 			"checksumSHA1": "Bnjd4MLL4tgg7h4a2aYNhWtFBb0=",
 			"path": "github.com/TykTechnologies/tyk-git/clients/objects",
-			"revision": "e52f64042920d055e54289d567cac2d20d28abff",
-			"revisionTime": "2019-04-16T04:24:54Z"
+			"revision": "ffede0580d7fafdce6286de4c7d620893e7b4775",
+			"revisionTime": "2019-04-16T10:18:16Z"
 		},
 		{
 			"checksumSHA1": "8isFGBofxsaVf2VK3YZUrdzkOAU=",

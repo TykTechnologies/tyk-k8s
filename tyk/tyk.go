@@ -33,11 +33,12 @@ func cleanSlug(s string) string {
 }
 
 type TykConf struct {
-	URL       string `yaml:"url"`
-	Secret    string `yaml:"secret"`
-	Org       string `yaml:"org"`
-	Templates string `yaml:"templates"`
-	IsGateway bool   `yaml:"is_gateway"`
+	URL                string `yaml:"url"`
+	Secret             string `yaml:"secret"`
+	Org                string `yaml:"org"`
+	Templates          string `yaml:"templates"`
+	IsGateway          bool   `yaml:"is_gateway"`
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
 }
 
 type APIDefOptions struct {
@@ -98,6 +99,7 @@ func newClient() interfaces.UniversalClient {
 		log.Fatalf("failed to create tyk API client: %v", err)
 	}
 
+	cl.SetInsecureTLS(cfg.InsecureSkipVerify)
 	return cl
 }
 

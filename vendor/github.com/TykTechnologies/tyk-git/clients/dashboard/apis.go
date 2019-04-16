@@ -27,6 +27,10 @@ func (c *Client) fixDBDef(def *objects.DBApiDefinition) {
 	}
 }
 
+func (c *Client) SetInsecureTLS(val bool) {
+	c.InsecureSkipVerify = val
+}
+
 func (c *Client) CreateAPI(def *apidef.APIDefinition) (string, error) {
 	fullPath := urljoin.Join(c.url, endpointAPIs)
 
@@ -35,6 +39,7 @@ func (c *Client) CreateAPI(def *apidef.APIDefinition) (string, error) {
 		Headers: map[string]string{
 			"Authorization": c.secret,
 		},
+		InsecureSkipVerify: c.InsecureSkipVerify,
 	}
 
 	resp, err := grequests.Get(fullPath, ro)
@@ -91,6 +96,7 @@ func (c *Client) CreateAPI(def *apidef.APIDefinition) (string, error) {
 		Headers: map[string]string{
 			"Authorization": c.secret,
 		},
+		InsecureSkipVerify: c.InsecureSkipVerify,
 	})
 
 	if err != nil {
@@ -131,6 +137,7 @@ func (c *Client) FetchAPIs() ([]objects.DBApiDefinition, error) {
 		Headers: map[string]string{
 			"Authorization": c.secret,
 		},
+		InsecureSkipVerify: c.InsecureSkipVerify,
 	}
 
 	resp, err := grequests.Get(fullPath, ro)
@@ -158,6 +165,7 @@ func (c *Client) UpdateAPI(def *apidef.APIDefinition) error {
 		Headers: map[string]string{
 			"Authorization": c.secret,
 		},
+		InsecureSkipVerify: c.InsecureSkipVerify,
 	}
 
 	resp, err := grequests.Get(fullPath, ro)
@@ -234,6 +242,7 @@ func (c *Client) UpdateAPI(def *apidef.APIDefinition) error {
 		Headers: map[string]string{
 			"Authorization": c.secret,
 		},
+		InsecureSkipVerify: c.InsecureSkipVerify,
 	})
 
 	if err != nil {
@@ -269,6 +278,7 @@ func (c *Client) Sync(apiDefs []apidef.APIDefinition) error {
 		Headers: map[string]string{
 			"Authorization": c.secret,
 		},
+		InsecureSkipVerify: c.InsecureSkipVerify,
 	}
 
 	resp, err := grequests.Get(fullPath, ro)
@@ -388,6 +398,7 @@ func (c *Client) DeleteAPI(id string) error {
 		Headers: map[string]string{
 			"Authorization": c.secret,
 		},
+		InsecureSkipVerify: c.InsecureSkipVerify,
 	})
 
 	if err != nil {
