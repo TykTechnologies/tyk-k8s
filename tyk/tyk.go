@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/TykTechnologies/tyk-git/clients/dashboard"
+	"github.com/TykTechnologies/tyk-git/clients/gateway"
+	"github.com/TykTechnologies/tyk-git/clients/interfaces"
 	"github.com/TykTechnologies/tyk-git/clients/objects"
 	"github.com/TykTechnologies/tyk-k8s/logger"
 	"github.com/TykTechnologies/tyk-k8s/processor"
@@ -35,6 +37,7 @@ type TykConf struct {
 	Secret    string `yaml:"secret"`
 	Org       string `yaml:"org"`
 	Templates string `yaml:"templates"`
+	IsGateway bool   `yaml:"is_gateway"`
 }
 
 type APIDefOptions struct {
@@ -47,7 +50,7 @@ type APIDefOptions struct {
 	Tags          []string
 	APIID         string
 	ID            string
-	LegacyAPIDef  *dashboard.DBApiDefinition
+	LegacyAPIDef  *objects.DBApiDefinition
 	Annotations   map[string]string
 	CertificateID []string
 }
@@ -66,7 +69,6 @@ func Init(forceConf *TykConf) {
 
 	if forceConf != nil {
 		cfg = forceConf
-		return
 	}
 
 	if cfg == nil {
@@ -83,10 +85,17 @@ func Init(forceConf *TykConf) {
 
 }
 
-func newClient() *dashboard.Client {
-	cl, err := dashboard.NewDashboardClient(cfg.URL, cfg.Secret)
+func newClient() interfaces.UniversalClient {
+	var cl interfaces.UniversalClient
+	var err error
+
+	cl, err = gateway.NewGatewayClient(cfg.URL, cfg.Secret)
+	if cfg.IsGateway {
+		cl, err = dashboard.NewDashboardClient(cfg.URL, cfg.Secret)
+	}
+
 	if err != nil {
-		log.Fatalf("failed to create tyk dashboard client: %v", err)
+		log.Fatalf("failed to create tyk API client: %v", err)
 	}
 
 	return cl
@@ -299,7 +308,7 @@ func UpdateAPIs(svcs map[string]*APIDefOptions) error {
 
 }
 
-func GetBySlug(slug string) (*dashboard.DBApiDefinition, error) {
+func GetBySlug(slug string) (*objects.DBApiDefinition, error) {
 	cl := newClient()
 
 	allServices, err := cl.FetchAPIs()
