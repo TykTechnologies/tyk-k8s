@@ -43,7 +43,7 @@ func (c *Client) CreateAPI(def *apidef.APIDefinition) (string, error) {
 	}
 
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("API Returned error: %v", resp.String())
+		return "", fmt.Errorf("API Returned error: %v for %v", resp.String(), fullPath)
 	}
 
 	apis := APISResponse{}
@@ -139,7 +139,7 @@ func (c *Client) FetchAPIs() ([]objects.DBApiDefinition, error) {
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("API Returned error: %v", resp.String())
+		return nil, fmt.Errorf("API Returned error: %v for %v", resp.String(), fullPath)
 	}
 
 	apis := APISResponse{}
@@ -166,7 +166,7 @@ func (c *Client) UpdateAPI(def *apidef.APIDefinition) error {
 	}
 
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("API Returned error: %v", resp.String())
+		return fmt.Errorf("API Returned error: %v for %v", resp.String(), fullPath)
 	}
 
 	apis := APISResponse{}

@@ -89,9 +89,9 @@ func newClient() interfaces.UniversalClient {
 	var cl interfaces.UniversalClient
 	var err error
 
-	cl, err = gateway.NewGatewayClient(cfg.URL, cfg.Secret)
+	cl, err = dashboard.NewDashboardClient(cfg.URL, cfg.Secret)
 	if cfg.IsGateway {
-		cl, err = dashboard.NewDashboardClient(cfg.URL, cfg.Secret)
+		cl, err = gateway.NewGatewayClient(cfg.URL, cfg.Secret)
 	}
 
 	if err != nil {
