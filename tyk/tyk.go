@@ -99,7 +99,11 @@ func newClient() interfaces.UniversalClient {
 		log.Fatalf("failed to create tyk API client: %v", err)
 	}
 
-	cl.SetInsecureTLS(cfg.InsecureSkipVerify)
+	if cfg.InsecureSkipVerify {
+		log.Warn("TLS certificate will not be verified")
+		cl.SetInsecureTLS(cfg.InsecureSkipVerify)
+	}
+
 	return cl
 }
 
