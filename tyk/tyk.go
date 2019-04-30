@@ -231,7 +231,7 @@ func DeleteBySlug(slug string) error {
 	for _, s := range allServices {
 		if cSlug == s.Slug {
 			log.Warning("found API entry, deleting: ", s.Id.Hex())
-			return cl.DeleteAPI(s.Id.Hex())
+			return cl.DeleteAPI(cl.GetActiveID(&s.APIDefinition))
 		}
 	}
 

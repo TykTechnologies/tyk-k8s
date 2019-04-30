@@ -384,24 +384,7 @@ func (c *ControlServer) watchPods() {
 	go c.podController.Run(c.stopCh)
 }
 
-func (c *ControlServer) handlePodDelete(obj interface{}) {
-	pd, ok := obj.(*v1.Pod)
-	log.Info("detected pod deletion:  ", pd.Name)
-	log.Info(pd.Annotations)
-	if !ok {
-		log.Errorf("type not allowed for RS watcher: %v", reflect.TypeOf(obj))
-		return
-	}
-
-	v, proc := pd.Annotations[injector.AdmissionWebhookAnnotationStatusKey]
-	if !proc {
-		return
-	}
-
-	if v != "injected" {
-		return
-	}
-
+func (c *ControlServer) handlePodDeleteForMesh(pd *v1.Pod) {
 	log.Info("pod is injector-managed")
 
 	remPds, err := c.client.CoreV1().Pods(pd.Namespace).List(v12.ListOptions{})
@@ -410,6 +393,7 @@ func (c *ControlServer) handlePodDelete(obj interface{}) {
 	}
 	log.Info("found ", len(remPds.Items), " in namespace")
 
+	var v string
 	rem := false
 	for _, pds := range remPds.Items {
 		v, rem = pds.Annotations[injector.AdmissionWebhookAnnotationStatusKey]
@@ -448,4 +432,31 @@ func (c *ControlServer) handlePodDelete(obj interface{}) {
 	}
 
 	log.Info("successfully removed ", serviceID, " and ", meshID)
+}
+
+func (c *ControlServer) handlePodDelete(obj interface{}) {
+	pd, ok := obj.(*v1.Pod)
+	log.Info("detected pod deletion:  ", pd.Name)
+	log.Info(pd.Annotations)
+	if !ok {
+		log.Errorf("type not allowed for RS watcher: %v", reflect.TypeOf(obj))
+		return
+	}
+
+	v, proc := pd.Annotations[injector.AdmissionWebhookAnnotationStatusKey]
+	if !proc {
+		return
+	}
+
+	if v != "injected" {
+		return
+	}
+
+	switch v {
+	case "injected":
+		c.handlePodDeleteForMesh(pd)
+		return
+	default:
+		return
+	}
 }
