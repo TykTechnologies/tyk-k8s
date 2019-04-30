@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk-git/clients/objects"
 	"github.com/ongoingio/urljoin"
 	"io"
 	"io/ioutil"
@@ -40,7 +41,7 @@ func (c *Client) CreateCertificate(cert []byte) (string, error) {
 		return "", fmt.Errorf("API Returned error: %v", string(rBody))
 	}
 
-	dbResp := CertResponse{}
+	dbResp := objects.CertResponse{}
 	if err := json.Unmarshal(rBody, &dbResp); err != nil {
 		return "", err
 	}

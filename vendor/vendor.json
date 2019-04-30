@@ -22,42 +22,46 @@
 			"revisionTime": "2016-12-01T17:12:39Z"
 		},
 		{
-			"checksumSHA1": "VuJi8edBcyCpCtUAYYzo3FpEO9g=",
-			"path": "github.com/TykTechnologies/tyk-git",
-			"revision": "a9b3ad87b336083b2d33b27e5571933d2755e12a",
-			"revisionTime": "2019-01-20T03:13:35Z"
-		},
-		{
-			"checksumSHA1": "kyhKe4Xd7Z+OOH7XwTERZHonJio=",
+			"checksumSHA1": "DCdJZEV/Fu8rWRcxDea+5YVFmf4=",
 			"path": "github.com/TykTechnologies/tyk-git/clients/dashboard",
-			"revision": "a9b3ad87b336083b2d33b27e5571933d2755e12a",
-			"revisionTime": "2019-01-20T03:13:35Z"
+			"revision": "0edbf9ff22d903a0ed4c509e3bee3b7607d94219",
+			"revisionTime": "2019-04-30T04:53:40Z"
 		},
 		{
-			"checksumSHA1": "Gnxxcl1zWgCLXo+dzZqX25jJtWg=",
+			"checksumSHA1": "kUr8fX0hgSkYmrWCxJ1lXWZyUxc=",
+			"path": "github.com/TykTechnologies/tyk-git/clients/gateway",
+			"revision": "0edbf9ff22d903a0ed4c509e3bee3b7607d94219",
+			"revisionTime": "2019-04-30T04:53:40Z"
+		},
+		{
+			"checksumSHA1": "81Yu6VOdRA0Vz2aptxY7juHRqrM=",
+			"path": "github.com/TykTechnologies/tyk-git/clients/interfaces",
+			"revision": "0edbf9ff22d903a0ed4c509e3bee3b7607d94219",
+			"revisionTime": "2019-04-30T04:53:40Z"
+		},
+		{
+			"checksumSHA1": "Bnjd4MLL4tgg7h4a2aYNhWtFBb0=",
 			"path": "github.com/TykTechnologies/tyk-git/clients/objects",
-			"revision": "a9b3ad87b336083b2d33b27e5571933d2755e12a",
-			"revisionTime": "2019-01-20T03:13:35Z"
-		},
-		{
-			"checksumSHA1": "KsVWiA/aZa1xyS3qI1Fs6zlw3Bs=",
-			"path": "github.com/TykTechnologies/tyk-k8s",
-			"revision": "e228dcebed616273f49bcbebe2db50b554d7b674",
-			"revisionTime": "2019-01-22T06:37:56Z"
+			"revision": "0edbf9ff22d903a0ed4c509e3bee3b7607d94219",
+			"revisionTime": "2019-04-30T04:53:40Z"
 		},
 		{
 			"checksumSHA1": "8isFGBofxsaVf2VK3YZUrdzkOAU=",
-			"origin": "github.com/TykTechnologies/tyk-git/vendor/github.com/TykTechnologies/tyk/apidef",
 			"path": "github.com/TykTechnologies/tyk/apidef",
-			"revision": "a9b3ad87b336083b2d33b27e5571933d2755e12a",
-			"revisionTime": "2019-01-20T03:13:35Z"
+			"revision": "288924abc78d9eb92c9be247951ec337f67afe74",
+			"revisionTime": "2019-01-28T15:15:05Z"
 		},
 		{
-			"checksumSHA1": "1Psesm1j6+rBb8G0DM7gzfs50g8=",
-			"origin": "github.com/TykTechnologies/tyk-git/vendor/github.com/TykTechnologies/tyk/log",
+			"checksumSHA1": "ydz+j8LMCss321AwXuxHJk15c7o=",
 			"path": "github.com/TykTechnologies/tyk/log",
-			"revision": "a9b3ad87b336083b2d33b27e5571933d2755e12a",
-			"revisionTime": "2019-01-20T03:13:35Z"
+			"revision": "288924abc78d9eb92c9be247951ec337f67afe74",
+			"revisionTime": "2019-01-28T15:15:05Z"
+		},
+		{
+			"checksumSHA1": "T7EyNMpVM5MbpdnOErb9wBwKxsU=",
+			"path": "github.com/TykTechnologies/tyk/regexp",
+			"revision": "288924abc78d9eb92c9be247951ec337f67afe74",
+			"revisionTime": "2019-01-28T15:15:05Z"
 		},
 		{
 			"checksumSHA1": "PHo45GeE88WGPeFo9s6rkK1ey4o=",
@@ -390,6 +394,13 @@
 			"revisionTime": "2019-01-16T07:26:07Z"
 		},
 		{
+			"checksumSHA1": "D+eX5lLgOgij1Hs7NO10OLdUVZo=",
+			"origin": "github.com/TykTechnologies/tyk/vendor/github.com/pmylund/go-cache",
+			"path": "github.com/pmylund/go-cache",
+			"revision": "288924abc78d9eb92c9be247951ec337f67afe74",
+			"revisionTime": "2019-01-28T15:15:05Z"
+		},
+		{
 			"checksumSHA1": "zmC8/3V4ls53DJlNTKDZwPSC/dA=",
 			"origin": "github.com/TykTechnologies/tyk-git/vendor/github.com/satori/go.uuid",
 			"path": "github.com/satori/go.uuid",
@@ -592,18 +603,17 @@
 			"revisionTime": "2019-01-11T19:51:21Z"
 		},
 		{
-			"checksumSHA1": "a68628cv8Cc7ML+3hmtZ/AhhmNQ=",
-			"origin": "github.com/TykTechnologies/tyk-git/vendor/gopkg.in/mgo.v2/bson",
+			"checksumSHA1": "/xRHTpN8WOK4nmZjJ1f96ER1b/o=",
 			"path": "gopkg.in/mgo.v2/bson",
-			"revision": "a9b3ad87b336083b2d33b27e5571933d2755e12a",
-			"revisionTime": "2019-01-20T03:13:35Z"
+			"revision": "9856a29383ce1c59f308dd1cf0363a79b5bef6b5",
+			"revisionTime": "2018-07-05T11:36:04Z"
 		},
 		{
 			"checksumSHA1": "8PDhPkU0sepu3Z1S6qp3CbXnPs0=",
 			"origin": "github.com/TykTechnologies/tyk-git/vendor/gopkg.in/mgo.v2/internal/json",
 			"path": "gopkg.in/mgo.v2/internal/json",
-			"revision": "a9b3ad87b336083b2d33b27e5571933d2755e12a",
-			"revisionTime": "2019-01-20T03:13:35Z"
+			"revision": "e52f64042920d055e54289d567cac2d20d28abff",
+			"revisionTime": "2019-04-16T04:24:54Z"
 		},
 		{
 			"checksumSHA1": "QqDq2x8XOU7IoOR98Cx1eiV5QY8=",

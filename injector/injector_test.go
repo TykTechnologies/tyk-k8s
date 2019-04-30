@@ -63,9 +63,10 @@ func TestWebhookServer_Serve(t *testing.T) {
 
 		whs.SidecarConfig.CreateRoutes = true
 		tyk.Init(&tyk.TykConf{
-			URL:    "http://localhost:8989",
-			Secret: "foo",
-			Org:    "1",
+			URL:       "http://localhost:8989",
+			Secret:    "foo",
+			Org:       "1",
+			IsGateway: false,
 		})
 
 		whs.Serve(rec, req)
