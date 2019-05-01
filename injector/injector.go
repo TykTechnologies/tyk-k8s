@@ -229,6 +229,16 @@ func createPatch(pod *corev1.Pod, svc *corev1.Service, sidecarConfig *Config, an
 	return json.Marshal(patch)
 }
 
+func checkAndGetTemplate(pd *corev1.Pod) string {
+	for k, v := range pd.Annotations {
+		if k == tyk.TemplateNameKey {
+			return v
+		}
+	}
+
+	return tyk.DefaultTemplate
+}
+
 // create service routes
 func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespace string) (map[string]string, error) {
 	_, idExists := annotations[AdmissionWebhookAnnotationInboundServiceIDKey]
@@ -253,7 +263,7 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespa
 		Slug:         slugID,
 		Target:       "http://localhost:6767",
 		ListenPath:   "/",
-		TemplateName: tyk.DefaultTemplate,
+		TemplateName: checkAndGetTemplate(pod),
 		Hostname:     hName,
 		Name:         slugID,
 		Tags:         []string{sName},
@@ -294,7 +304,7 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespa
 		Slug:         meshSlugID,
 		Target:       tgt,
 		ListenPath:   listenPath,
-		TemplateName: tyk.DefaultTemplate,
+		TemplateName: checkAndGetTemplate(pod),
 		Hostname:     "",
 		Name:         meshSlugID,
 		Tags:         []string{meshTag},

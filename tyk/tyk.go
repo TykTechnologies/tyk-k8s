@@ -64,6 +64,7 @@ var defaultTemplate *template.Template
 
 const (
 	DefaultTemplate = "default"
+	TemplateNameKey = "template.service.tyk.io/"
 )
 
 func Init(forceConf *TykConf) {
@@ -82,6 +83,7 @@ func Init(forceConf *TykConf) {
 	}
 
 	if cfg.Templates != "" {
+		log.Info("template directory detected, loading from ", cfg.Templates)
 		templates = template.Must(template.ParseGlob(path.Join(cfg.Templates, "*")))
 	}
 
@@ -124,7 +126,7 @@ func getTemplate(name string) (*template.Template, error) {
 
 	tpl := templates.Lookup(name)
 	if tpl == nil {
-		return defaultTemplate, errors.New("not found")
+		return defaultTemplate, errors.New("template not found")
 	}
 
 	return tpl, nil

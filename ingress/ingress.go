@@ -32,7 +32,6 @@ var opLog = sync.Map{}
 const (
 	IngressAnnotation      = "kubernetes.io/ingress.class"
 	IngressAnnotationValue = "tyk"
-	TemplateNameKey        = "template.service.tyk.io/"
 )
 
 type ControlServer struct {
@@ -156,6 +155,16 @@ func (c *ControlServer) handleTLS(ing *v1beta1.Ingress) (map[string]string, erro
 
 }
 
+func checkAndGetTemplate(ing *v1beta1.Ingress) string {
+	for k, v := range ing.Annotations {
+		if k == tyk.TemplateNameKey {
+			return v
+		}
+	}
+
+	return tyk.DefaultTemplate
+}
+
 func (c *ControlServer) doAdd(ing *v1beta1.Ingress) error {
 	tags := []string{"ingress"}
 	hName := ""
@@ -178,7 +187,7 @@ func (c *ControlServer) doAdd(ing *v1beta1.Ingress) error {
 			opts.Name = c.getAPIName(ing.Name, svcN)
 			opts.Target = fmt.Sprintf("http://%s.%s:%d", svcN, ing.Namespace, svcP)
 			opts.Slug = c.generateIngressID(ing.Name, ing.Namespace, p)
-			opts.TemplateName = tyk.DefaultTemplate
+			opts.TemplateName = checkAndGetTemplate(ing)
 			opts.Hostname = hName
 			opts.Tags = tags
 			opts.Annotations = ing.Annotations
@@ -264,7 +273,7 @@ func (c *ControlServer) handleIngressUpdate(oldObj interface{}, newObj interface
 			opts.Name = c.getAPIName(newIng.Name, svcN)
 			opts.Target = fmt.Sprintf("http://%s.%s:%d", svcN, newIng.Namespace, svcP)
 			opts.Slug = c.generateIngressID(newIng.Name, newIng.Namespace, p)
-			opts.TemplateName = tyk.DefaultTemplate
+			opts.TemplateName = checkAndGetTemplate(newIng)
 			opts.Hostname = hName
 			opts.Tags = tags
 

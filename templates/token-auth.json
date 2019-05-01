@@ -7,7 +7,7 @@
   "use_standard_auth": true,
   "definition": {
     "location": "header",
-    "key": "x-api-version",
+    "key": "x-api-version-foo",
     "strip_path": true
   },
   "version_data": {
