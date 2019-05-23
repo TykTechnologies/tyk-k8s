@@ -5,6 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
+	"regexp"
+	"strings"
+	"text/template"
+
 	"github.com/TykTechnologies/tyk-git/clients/dashboard"
 	"github.com/TykTechnologies/tyk-git/clients/gateway"
 	"github.com/TykTechnologies/tyk-git/clients/interfaces"
@@ -13,10 +18,6 @@ import (
 	"github.com/TykTechnologies/tyk-k8s/processor"
 	"github.com/satori/go.uuid"
 	"github.com/spf13/viper"
-	"path"
-	"regexp"
-	"strings"
-	"text/template"
 )
 
 func cleanSlug(s string) string {
@@ -64,7 +65,7 @@ var defaultTemplate *template.Template
 
 const (
 	DefaultTemplate = "default"
-	TemplateNameKey = "template.service.tyk.io/"
+	TemplateNameKey = "template.service.tyk.io"
 )
 
 func Init(forceConf *TykConf) {
