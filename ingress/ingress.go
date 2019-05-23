@@ -5,6 +5,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"os"
+	"reflect"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/TykTechnologies/tyk-k8s/injector"
 	"github.com/TykTechnologies/tyk-k8s/logger"
 	"github.com/TykTechnologies/tyk-k8s/tyk"
@@ -16,11 +22,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
-	"reflect"
-	"strings"
-	"sync"
-	"time"
 )
 
 type Config struct{}
@@ -158,6 +159,7 @@ func (c *ControlServer) handleTLS(ing *v1beta1.Ingress) (map[string]string, erro
 func checkAndGetTemplate(ing *v1beta1.Ingress) string {
 	for k, v := range ing.Annotations {
 		if k == tyk.TemplateNameKey {
+			log.Info("template annotation found with value: %v", v)
 			return v
 		}
 	}
