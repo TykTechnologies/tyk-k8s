@@ -159,7 +159,7 @@ func (c *ControlServer) handleTLS(ing *v1beta1.Ingress) (map[string]string, erro
 func checkAndGetTemplate(ing *v1beta1.Ingress) string {
 	for k, v := range ing.Annotations {
 		if k == tyk.TemplateNameKey {
-			log.Info("template annotation found with value: %v", v)
+			log.Infof("template annotation found with value: %v", v)
 			return v
 		}
 	}
