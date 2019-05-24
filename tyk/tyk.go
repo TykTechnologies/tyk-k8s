@@ -85,7 +85,7 @@ func Init(forceConf *TykConf) {
 
 	if cfg.Templates != "" {
 		log.Info("template directory detected, loading from ", cfg.Templates)
-		templates = template.Must(template.ParseGlob(path.Join(cfg.Templates, "*")))
+		templates = template.Must(template.ParseGlob(path.Join(cfg.Templates, "*.json")))
 	}
 
 	if cfg.InsecureSkipVerify {
