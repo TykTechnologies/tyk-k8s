@@ -13,7 +13,7 @@ Removing an ingress will then remove the corresponding API definition.
 
 ### Installation
 
-It is recommended to use the [tyk-k8s Helm chart which is available here](https://github.com/TykTechnologies/tyk-k8s-helm).
+It is recommended to use the [Tyk for Kubernetes Helm chart which is available here](https://github.com/TykTechnologies/tyk-helm-chart).
 
 ### Usage:
 
