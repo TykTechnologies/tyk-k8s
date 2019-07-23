@@ -41,6 +41,7 @@ type TykConf struct {
 	Templates          string `yaml:"templates"`
 	IsGateway          bool   `yaml:"is_gateway"`
 	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
+	IsHybrid           bool   `yaml:"is_hybrid"`
 }
 
 type APIDefOptions struct {
@@ -143,10 +144,16 @@ func TemplateService(opts *APIDefOptions) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// In hybrid gateway we want slug to be a human readable path - not the Ingress ID
+	if cfg.IsHybrid {
+		opts.Slug = opts.ListenPath
+	} else {
+		opts.Slug = cleanSlug(opts.Slug)
+	}
 
 	tplVars := map[string]interface{}{
 		"Name":          opts.Name,
-		"Slug":          cleanSlug(opts.Slug),
+		"Slug":          opts.Slug,
 		"Org":           cfg.Org,
 		"ListenPath":    opts.ListenPath,
 		"Target":        opts.Target,
