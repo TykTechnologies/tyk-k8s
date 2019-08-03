@@ -3,12 +3,13 @@ package webserver
 import (
 	"context"
 	"crypto/sha256"
-	"github.com/TykTechnologies/tyk-k8s/logger"
-	"github.com/ghodss/yaml"
-	"github.com/gorilla/mux"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/TykTechnologies/tyk-k8s/logger"
+	"github.com/ghodss/yaml"
+	"github.com/gorilla/mux"
 )
 
 var server *WebServer
@@ -80,7 +81,9 @@ func (s *WebServer) Start() {
 }
 
 func (s *WebServer) Stop() error {
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	err := s.srv.Shutdown(ctx)
 	if err != nil {
 		return err
