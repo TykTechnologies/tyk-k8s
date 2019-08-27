@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/TykTechnologies/tyk-git/clients/objects"
 	"github.com/TykTechnologies/tyk-k8s/tyk"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,6 +55,44 @@ func TestControlServer_getAPIName(t *testing.T) {
 	if n != "foo:bar" {
 		t.Fatal("expected 'foo:bar' got ", n)
 	}
+}
+
+func TestControlServer_noPaths(t *testing.T) {
+	example := `
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: cafe-ingress
+  annotations:
+    kubernetes.io/ingress.class: tyk
+spec:
+  rules:
+    - host: cafe.example.com
+`
+
+	go serverSetup()
+	x := NewController()
+
+	ing := &v1beta1.Ingress{}
+	err := yaml.Unmarshal([]byte(example), ing)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tykConf := &tyk.TykConf{}
+	tykConf.URL = "http://localhost:9696"
+	tykConf.Secret = "foo"
+
+	tyk.Init(tykConf)
+
+	err = x.doAdd(ing)
+	// Should fail
+	if err == nil {
+		t.Fatal(err)
+	}
+
+	lastResponse = ""
+
 }
 
 func TestControlServer_doAdd(t *testing.T) {

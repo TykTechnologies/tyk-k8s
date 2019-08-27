@@ -181,6 +181,14 @@ func (c *ControlServer) doAdd(ing *v1beta1.Ingress) error {
 		certID, addCert := certs[hName]
 		log.Info("checking if cert for host exists: ", r0.Host, ", (", addCert, ")")
 
+		if r0.HTTP == nil {
+			return fmt.Errorf("rule has nil paths, can't route without explicit back end: %v", hName)
+		}
+
+		if len(r0.HTTP.Paths) == 0 {
+			return fmt.Errorf("rule has 0 paths, can't route without explicit back end: %v", hName)
+		}
+
 		for _, p := range r0.HTTP.Paths {
 			opts := &tyk.APIDefOptions{}
 			opts.ListenPath = p.Path
