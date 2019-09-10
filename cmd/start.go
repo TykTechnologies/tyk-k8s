@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/TykTechnologies/tyk-k8s/ca"
 	"github.com/TykTechnologies/tyk-k8s/ingress"
 	"github.com/TykTechnologies/tyk-k8s/injector"
 	"github.com/TykTechnologies/tyk-k8s/logger"
@@ -25,17 +26,34 @@ var startCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("no Server entry found in config file: %v", err)
 		}
+		webserver.Server().Config(sConf)
 
 		// Web server mutating webhook
-		webserver.Server().Config(sConf)
 		whConf := &injector.Config{}
 		err = viper.UnmarshalKey("Injector", whConf)
 		if err != nil {
 			log.Fatalf("couldn't read injector config: %v", err)
 		}
 
+		// CA configuration
+		caConf := &ca.Config{}
+		err = viper.UnmarshalKey("CA", caConf)
+		if err != nil {
+			log.Fatalf("couldn't read CA config: %v", err)
+		}
+
 		whs := &injector.WebhookServer{
 			SidecarConfig: whConf,
+			CAConfig:      caConf,
+		}
+
+		if whConf.EnableMeshTLS {
+			caClient, err := ca.New(caConf)
+			if err != nil {
+				log.Fatal("failed to init CA client: ", err)
+			}
+
+			whs.CAClient = caClient
 		}
 
 		webserver.Server().AddRoute("POST", "/inject", whs.Serve)

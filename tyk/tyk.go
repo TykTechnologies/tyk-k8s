@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/apidef"
 	"path"
 	"regexp"
 	"strings"
@@ -357,6 +358,28 @@ func GetBySlug(slug string) (*objects.DBApiDefinition, error) {
 func DeleteByID(id string) error {
 	cl := newClient()
 	return cl.DeleteAPI(id)
+}
+
+func GetByID(id string) (*objects.DBApiDefinition, error) {
+	cl := newClient()
+
+	allServices, err := cl.FetchAPIs()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, s := range allServices {
+		if id == s.APIID {
+			return &s, nil
+		}
+	}
+
+	return nil, fmt.Errorf("service with id %s not found", id)
+}
+
+func UpdateAPI(def *apidef.APIDefinition) error {
+	cl := newClient()
+	return cl.UpdateAPI(def)
 }
 
 var defaultAPITemplate = `

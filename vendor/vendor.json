@@ -70,6 +70,30 @@
 			"revisionTime": "2019-01-21T03:21:27Z"
 		},
 		{
+			"checksumSHA1": "cATIZhwcE3K3rOm8JTZbHMYAOJ4=",
+			"path": "github.com/cloudflare/cfssl/api/client",
+			"revision": "b1ec8c586c2aa3ec3eaf4a622933f169cfa5648b",
+			"revisionTime": "2019-08-08T01:16:37Z"
+		},
+		{
+			"checksumSHA1": "MOxpP9bGNRoPvAN04L8Fuw71U6w=",
+			"path": "github.com/cloudflare/cfssl/auth",
+			"revision": "b1ec8c586c2aa3ec3eaf4a622933f169cfa5648b",
+			"revisionTime": "2019-08-08T01:16:37Z"
+		},
+		{
+			"checksumSHA1": "TYMcPjSZ11vVojV4tMbU0CCrjfc=",
+			"path": "github.com/cloudflare/cfssl/cli/genkey",
+			"revision": "b1ec8c586c2aa3ec3eaf4a622933f169cfa5648b",
+			"revisionTime": "2019-08-08T01:16:37Z"
+		},
+		{
+			"checksumSHA1": "kzLqBPu5HBIOfCZxOgBOFjUfNno=",
+			"path": "github.com/cloudflare/cfssl/csr",
+			"revision": "b1ec8c586c2aa3ec3eaf4a622933f169cfa5648b",
+			"revisionTime": "2019-08-08T01:16:37Z"
+		},
+		{
 			"checksumSHA1": "7UT+dVVfOn8IA79ITFiGNMb2c/4=",
 			"origin": "k8s.io/apimachinery/vendor/github.com/davecgh/go-spew/spew",
 			"path": "github.com/davecgh/go-spew/spew",

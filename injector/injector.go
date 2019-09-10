@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk-k8s/ca"
 	"github.com/TykTechnologies/tyk-k8s/logger"
 	"github.com/TykTechnologies/tyk-k8s/tyk"
 	"io/ioutil"
@@ -40,18 +41,22 @@ const (
 	admissionWebhookAnnotationRouteKey            = "injector.tyk.io/route"
 	AdmissionWebhookAnnotationInboundServiceIDKey = "injector.tyk.io/inbound-service-id"
 	AdmissionWebhookAnnotationMeshServiceIDKey    = "injector.tyk.io/mesh-service-id"
-
-	meshTag = "mesh"
+	AdmissionWebhookAnnotationGroupKey            = "injector.tyk.io/group"
+	AdmissionWebhookAnnotationAllowedCallerGroups = "injector.tyk.io/caller-access-groups"
+	meshTag                                       = "mesh"
 )
 
 type WebhookServer struct {
 	SidecarConfig *Config
+	CAConfig      *ca.Config
+	CAClient      *ca.Client
 }
 
 type Config struct {
 	Containers     []corev1.Container `yaml:"containers"`
 	InitContainers []corev1.Container `yaml:"initContainers"`
 	CreateRoutes   bool               `yaml:"createRoutes"`
+	EnableMeshTLS  bool               `yaml:"enableMeshTLS"`
 }
 
 type namedThing struct {
@@ -240,7 +245,7 @@ func checkAndGetTemplate(pd *corev1.Pod) string {
 }
 
 // create service routes
-func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespace string) (map[string]string, error) {
+func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespace string, tls bool) (map[string]string, error) {
 	_, idExists := annotations[AdmissionWebhookAnnotationInboundServiceIDKey]
 	if idExists {
 		return annotations, nil
@@ -290,7 +295,11 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespa
 	var pt int32
 	pt = 8080
 
-	tgt := fmt.Sprintf("http://%s:%d", hName, pt)
+	tr := "http"
+	if tls {
+		tr = "https"
+	}
+	tgt := fmt.Sprintf("%s://%s:%d", tr, hName, pt)
 	listenPath := sName
 	for k, v := range pod.Annotations {
 		if k == admissionWebhookAnnotationRouteKey {
@@ -327,6 +336,88 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespa
 	return annotations, nil
 }
 
+func (whsvr *WebhookServer) generateStoreAndRegisterInboundCert(ingressID string) error {
+	serverCert, err := whsvr.generateServerCert(ingressID)
+	if err != nil {
+		return fmt.Errorf("can't generate certificate: %v", err)
+	}
+
+	aDef, err := tyk.GetByID(ingressID)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve ingress API definition: %v", err)
+	}
+
+	certID, err := tyk.CreateCertificate(serverCert.Bundle.Certificate, serverCert.Bundle.PrivateKey)
+	if err != nil {
+		return fmt.Errorf("failed to upload certificate to tyk secure store: %v", err)
+	}
+	serverCert.Bundle.Fingerprint = certID
+
+	if len(aDef.Certificates) == 0 {
+		aDef.Certificates = make([]string, 0)
+	}
+
+	aDef.Certificates = append(aDef.Certificates, certID)
+	err = tyk.UpdateAPI(&aDef.APIDefinition)
+	if err != nil {
+		return fmt.Errorf("failed to store updated API Definition: %v", err)
+	}
+
+	_, err = whsvr.CAClient.StoreCert(serverCert)
+	if err != nil {
+		return fmt.Errorf("failed to store certificate reference in controller store: %v", err)
+	}
+
+	return nil
+}
+
+func (whsvr *WebhookServer) handleMeshTLS(ann map[string]string) error {
+	if !whsvr.SidecarConfig.EnableMeshTLS {
+		// no TLS needed, skip
+		return nil
+	}
+
+	// Validate and get required configuration
+
+	// For mTLS we will need the mesh API ID
+	//meshID, ok := ann[AdmissionWebhookAnnotationMeshServiceIDKey]
+	//if !ok {
+	//	return fmt.Errorf("can't generate server cert without a mesh ID")
+	//}
+
+	ingressID, ok := ann[AdmissionWebhookAnnotationInboundServiceIDKey]
+	if !ok {
+		return fmt.Errorf("can't generate server cert without an inbound API ID")
+	}
+
+	// Handle inbound ID first as that's a straight TLS cert
+	err := whsvr.generateStoreAndRegisterInboundCert(ingressID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (whsvr *WebhookServer) generateServerCert(id string) (*ca.CertModel, error) {
+	apidef, err := tyk.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	hostname := apidef.Domain
+	if hostname == "" {
+		return nil, fmt.Errorf("domain cannot be emtpy")
+	}
+
+	bdl, err := whsvr.CAClient.GenerateCert(hostname)
+	if err != nil {
+		return nil, err
+	}
+
+	return ca.NewCertModel(bdl), nil
+}
+
 func (whsvr *WebhookServer) processPodMutations(ar *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	req := ar.Request
 	var pod corev1.Pod
@@ -357,7 +448,7 @@ func (whsvr *WebhookServer) processPodMutations(ar *v1beta1.AdmissionReview) *v1
 	// We create the service routes first, because we need the IDs
 	if whsvr.SidecarConfig.CreateRoutes {
 		var err error
-		annotations, err = createServiceRoutes(&pod, annotations, ar.Request.Namespace)
+		annotations, err = createServiceRoutes(&pod, annotations, ar.Request.Namespace, whsvr.SidecarConfig.EnableMeshTLS)
 		if err != nil {
 			return &v1beta1.AdmissionResponse{
 				Result: &metav1.Status{
@@ -366,6 +457,16 @@ func (whsvr *WebhookServer) processPodMutations(ar *v1beta1.AdmissionReview) *v1
 			}
 		}
 	}
+
+	// === TLS Specific operations ===
+	if err := whsvr.handleMeshTLS(annotations); err != nil {
+		return &v1beta1.AdmissionResponse{
+			Result: &metav1.Status{
+				Message: err.Error(),
+			},
+		}
+	}
+	// === End TLS ====
 
 	// Create the patch
 	patchBytes, err := createPatch(&pod, nil, whsvr.SidecarConfig, annotations)
