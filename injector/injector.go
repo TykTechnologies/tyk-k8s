@@ -291,13 +291,14 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespa
 
 	annotations[AdmissionWebhookAnnotationInboundServiceIDKey] = ibID
 
-	// mesh route
+	// mesh route points to the *service* so we can enable load balancing
 	var pt int32
-	pt = 8080
+	pt = 80
 
 	tr := "http"
 	if tls {
 		tr = "https"
+		pt = 443
 	}
 	tgt := fmt.Sprintf("%s://%s:%d", tr, hName, pt)
 	listenPath := sName
@@ -341,8 +342,9 @@ func (whsvr *WebhookServer) generateStoreAndRegisterInboundCert(ingressID string
 	if err != nil {
 		return fmt.Errorf("can't generate certificate: %v", err)
 	}
+	log.Info("MeshTLS: generated server certificate")
 
-	aDef, err := tyk.GetByID(ingressID)
+	aDef, err := tyk.GetByObjectID(ingressID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve ingress API definition: %v", err)
 	}
@@ -351,6 +353,7 @@ func (whsvr *WebhookServer) generateStoreAndRegisterInboundCert(ingressID string
 	if err != nil {
 		return fmt.Errorf("failed to upload certificate to tyk secure store: %v", err)
 	}
+	log.Info("MeshTLS: uploaded certificate to tyk secure store")
 	serverCert.Bundle.Fingerprint = certID
 
 	if len(aDef.Certificates) == 0 {
@@ -362,17 +365,20 @@ func (whsvr *WebhookServer) generateStoreAndRegisterInboundCert(ingressID string
 	if err != nil {
 		return fmt.Errorf("failed to store updated API Definition: %v", err)
 	}
+	log.Info("MeshTLS: updated API definition to use new cert fingerprint")
 
 	_, err = whsvr.CAClient.StoreCert(serverCert)
 	if err != nil {
 		return fmt.Errorf("failed to store certificate reference in controller store: %v", err)
 	}
+	log.Info("MeshTLS: stored new certificate in mongo")
 
 	return nil
 }
 
 func (whsvr *WebhookServer) handleMeshTLS(ann map[string]string) error {
 	if !whsvr.SidecarConfig.EnableMeshTLS {
+		log.Info("mesh TLS disabled, skipping check")
 		// no TLS needed, skip
 		return nil
 	}
@@ -391,6 +397,7 @@ func (whsvr *WebhookServer) handleMeshTLS(ann map[string]string) error {
 	}
 
 	// Handle inbound ID first as that's a straight TLS cert
+	log.Info("MeshTLS: starting last-mile TLS generation")
 	err := whsvr.generateStoreAndRegisterInboundCert(ingressID)
 	if err != nil {
 		return err
@@ -400,7 +407,7 @@ func (whsvr *WebhookServer) handleMeshTLS(ann map[string]string) error {
 }
 
 func (whsvr *WebhookServer) generateServerCert(id string) (*ca.CertModel, error) {
-	apidef, err := tyk.GetByID(id)
+	apidef, err := tyk.GetByObjectID(id)
 	if err != nil {
 		return nil, err
 	}

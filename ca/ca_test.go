@@ -17,8 +17,10 @@ func TestCA_GenerateSSLCert(t *testing.T) {
 
 	ca := Client{
 		CA: &Config{
-			Addr: host,
-			Key:  key,
+			Addr:        host,
+			Key:         key,
+			Secure:      true,
+			SkipCACheck: true,
 			DefaultKeyRequest: &csr.KeyRequest{
 				A: "rsa",
 				S: 4096,

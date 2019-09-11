@@ -4,13 +4,14 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"github.com/TykTechnologies/tyk-k8s/logger"
-	"github.com/TykTechnologies/tyk-k8s/util"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/cloudflare/cfssl/api/client"
 	"github.com/cloudflare/cfssl/auth"
 	"github.com/cloudflare/cfssl/csr"
@@ -32,6 +33,8 @@ type Config struct {
 	DefaultNames      []csr.Name      `yaml:"defaultNames"`
 	DefaultKeyRequest *csr.KeyRequest `yaml:"defaultKeyRequest"`
 	MongoConnStr      string          `yaml:"mongoConnStr"`
+	Secure            bool
+	SkipCACheck       bool
 }
 
 type Client struct {
@@ -84,12 +87,19 @@ func New(cfg *Config) (*Client, error) {
 }
 
 func (c *Client) getAuthenticatedClient() (*client.AuthRemote, error) {
+	var tlsOptions *tls.Config
+	if c.CA.Secure {
+		tlsOptions = &tls.Config{
+			InsecureSkipVerify: c.CA.SkipCACheck,
+		}
+	}
+
 	pr, err := auth.New(c.CA.Key, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return client.NewAuthServer(c.CA.Addr, nil, pr), nil
+	return client.NewAuthServer(c.CA.Addr, tlsOptions, pr), nil
 
 }
 
@@ -177,12 +187,16 @@ func (c *Client) GenerateCert(CN string) (*Bundle, error) {
 		return nil, err
 	}
 
-	cObj := util.GetCertFromPem(cert, pKey)
-	if len(cObj.Leaf.Extensions) == 0 {
-		return nil, fmt.Errorf("no fingerprint in certificate")
+	cpb, _ := pem.Decode(cert)
+	cObj, e := x509.ParseCertificate(cpb.Bytes)
+	if e != nil {
+		return nil, e
 	}
 
-	return &Bundle{PrivateKey: pKey, Certificate: cert, Fingerprint: string(cObj.Leaf.Extensions[0].Value)}, nil
+	var certSHA string
+	certSHA = certs.HexSHA256(cObj.Raw)
+
+	return &Bundle{PrivateKey: pKey, Certificate: cert, Fingerprint: certSHA}, nil
 }
 
 func (c *Client) getPrivateKeyAsPem(pKey crypto.PrivateKey, kr *csr.KeyRequest) ([]byte, error) {
@@ -269,8 +283,12 @@ func NewCertModel(bundle *Bundle) *CertModel {
 	c.Created = time.Now()
 	c.UID = uuid.NewV4().String()
 
-	cObj := util.GetCertFromPem(bundle.Certificate, bundle.PrivateKey)
-	c.Expires = cObj.Leaf.NotAfter
+	cpb, _ := pem.Decode(bundle.Certificate)
+	cObj, e := x509.ParseCertificate(cpb.Bytes)
+	if e != nil {
+		log.Fatal("failed to generate certificate model: ", e)
+	}
 
+	c.Expires = cObj.NotAfter
 	return c
 }

@@ -360,7 +360,7 @@ func DeleteByID(id string) error {
 	return cl.DeleteAPI(id)
 }
 
-func GetByID(id string) (*objects.DBApiDefinition, error) {
+func GetByObjectID(id string) (*objects.DBApiDefinition, error) {
 	cl := newClient()
 
 	allServices, err := cl.FetchAPIs()
@@ -369,7 +369,7 @@ func GetByID(id string) (*objects.DBApiDefinition, error) {
 	}
 
 	for _, s := range allServices {
-		if id == s.APIID {
+		if id == s.Id.Hex() {
 			return &s, nil
 		}
 	}

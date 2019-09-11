@@ -1,0 +1,77 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: cfssl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cfssl
+  template:
+    metadata:
+      labels:
+        app: cfssl
+    spec:
+      containers:
+      - name: cfssl
+        image: tykio/tyk-cfssl:unstable
+        ports:
+        - containerPort: 8888
+        env:
+        - name: TYK_TS
+          value: "1"
+        volumeMounts:
+        - mountPath: /cfssl/ca.pem
+          subPath: ca.pem
+          name: ca-pem
+        - mountPath: /cfssl/ca-key.pem
+          subPath: ca-key.pem
+          name: ca-key-pem
+        - mountPath: /cfssl/config_ca.json
+          subPath: config_ca.json
+          name: config-ca-json
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: ca-pem
+        name: ca-pem
+      - configMap:
+          defaultMode: 420
+          name: ca-key-pem
+        name: ca-key-pem
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: config_ca.json
+            path: config_ca.json
+          name: config-ca-json
+        name: config-ca-json
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cfssl-svc
+spec:
+  ports:
+  - port: 80
+    targetPort: 8888
+    protocol: TCP
+    name: http
+  selector:
+    app: cfssl
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: cfssl-ingress
+  annotations:
+    kubernetes.io/ingress.class: tyk
+spec:
+  rules:
+  - host: petstore42.tyk.technology
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: cfssl-svc
+          servicePort: 80
