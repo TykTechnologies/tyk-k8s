@@ -295,12 +295,11 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespa
 
 	// mesh route points to the *service* so we can enable load balancing
 	var pt int32
-	pt = 80
+	pt = 8080
 
 	tr := "http"
 	if tls {
 		tr = "https"
-		pt = 443
 	}
 	tgt := fmt.Sprintf("%s://%s:%d", tr, hName, pt)
 	listenPath := sName

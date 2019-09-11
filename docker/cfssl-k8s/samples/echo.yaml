@@ -31,13 +31,13 @@ kind: Service
 metadata:
   # The service name should match the app name
   name: echo
+
+  # Remember to annotate the service too
   annotations:
     injector.tyk.io/inject: "true"
 spec:
   ports:
     - port: 80
-      # The sidecar will listen on port 8080, so ensure that the service points there
-      # TODO: there is a service mutator, investigate why it is not working
       targetPort: 80
       protocol: TCP
       name: http

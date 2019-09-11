@@ -1,0 +1,22 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: sleep
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: sleep
+      annotations:
+        # This container has no actual inbound listener, but you can use it to test
+        # `curl` commands against a sidecar, remove this annotation to test the mesh
+        # endpoint directly
+        injector.tyk.io/inject: "true"
+        injector.tyk.io/route: "/sleepy-time"
+    spec:
+      containers:
+      - name: sleep
+        image: tutum/curl
+        command: ["/bin/sleep","infinity"]
+        imagePullPolicy: IfNotPresent
