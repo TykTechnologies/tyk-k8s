@@ -32,7 +32,7 @@ metadata:
   # The service name should match the app name
   name: echo
 
-  # Remember to annotate the service too
+  # Remember to annotate the service too, this ensures the ports are correctly rewritten for the sidecar
   annotations:
     injector.tyk.io/inject: "true"
 spec:

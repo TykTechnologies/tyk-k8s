@@ -118,4 +118,18 @@ Now we can deploy CFSSL, you can get the deployment file mentioned below from th
 kubectl create -f ./deployment.yaml
 ```
 
-## 3. TBC
+## 3. Create some services
+
+There are three services included in the `docker/cfssl-k8s/samples` folder:
+
+1. `echo`: This just echoes back your request: you will notice that the service itself is not configured for TLS at all, it is just a standard deployment (with an ingress).
+2. `sleep`: (`launchpad-mesh.yaml`): This is a dormant container, it doesn;t do anything, but you can `kubectl exec` into it to run test curl commands against `echo`. This container is also mesh-managed. In order to call the echo service, you would run something like: `curl -k https://localhost/echo-svc/foo`, we can use _any_ hostname, the sidecar will intercept any traffic on port `80` and `443` coming from within the container and route it through the gateway
+3. `curl` (`launchpad.yaml`): this is a dormant container, but is not meshed, you can `kubectl exec` into this container to test your internal service inbound endpoints from outside the mesh. To call the echo service from this container you would run `curl -k https://echo.default/foo`
+
+All of the above will give you a "failed to proxy" error currently since these APIs are all validating the issuer and the CA cert has not been added to these containers yet. That's still a major TODO.
+
+# TODO:
+
+- [ ] Auto-inject the CA root to services
+- [ ] Automatic certificate renewal and rotation
+- [ ] Mutual TLS grants
