@@ -3,8 +3,8 @@ package ingress
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/tyk-git/clients/objects"
 	"github.com/TykTechnologies/tyk-k8s/tyk"
+	"github.com/TykTechnologies/tyk-sync/clients/objects"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"k8s.io/api/extensions/v1beta1"

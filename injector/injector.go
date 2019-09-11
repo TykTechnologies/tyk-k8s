@@ -162,13 +162,15 @@ func updateAnnotation(target map[string]string, added map[string]string) (patch 
 	return patch
 }
 
-func mutateService(svc *corev1.Service, basePath string) (patch []patchOperation) {
+func mutateService(svc *corev1.Service, basePath string, sidecarConfig *Config) (patch []patchOperation) {
+
+	var sidecarPort int32 = 8080
 
 	sidecarSvcPort := &corev1.ServicePort{
 		Name: "tyk-sidecar",
-		Port: 8080,
+		Port: sidecarPort,
 		TargetPort: intstr.IntOrString{
-			IntVal: 8080,
+			IntVal: sidecarPort,
 		},
 	}
 
@@ -224,7 +226,7 @@ func createPatch(pod *corev1.Pod, svc *corev1.Service, sidecarConfig *Config, an
 	var patch []patchOperation
 
 	if svc != nil {
-		patch = append(patch, mutateService(svc, "/spec/ports")...)
+		patch = append(patch, mutateService(svc, "/spec/ports", sidecarConfig)...)
 		return json.Marshal(patch)
 	}
 
@@ -513,7 +515,7 @@ func (whsvr *WebhookServer) processServiceMutations(ar *v1beta1.AdmissionReview)
 
 	// determine whether to perform mutation
 	if !mutationRequired(ignoredNamespaces, &service.ObjectMeta) {
-		log.Infof("Skipping mutation for %s/%s due to policy check", service.Namespace, service.Name)
+		log.Infof("SERVICE: Skipping mutation for %s/%s due to policy check", service.Namespace, service.Name)
 		return &v1beta1.AdmissionResponse{
 			Allowed: true,
 		}
