@@ -42,6 +42,12 @@ var startCmd = &cobra.Command{
 			log.Fatalf("couldn't read CA config: %v", err)
 		}
 
+		// Module init - adds a mesh cert ID if none exist
+		err = ModuleInit(whConf, caConf)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		whs := &injector.WebhookServer{
 			SidecarConfig: whConf,
 			CAConfig:      caConf,
@@ -82,6 +88,29 @@ var startCmd = &cobra.Command{
 		}
 
 	},
+}
+
+func ModuleInit(sideCarConfig *injector.Config, caConfig *ca.Config) error {
+	if !sideCarConfig.EnableMeshTLS {
+		return nil
+	}
+
+	if sideCarConfig.MeshCertificateID != "" {
+		return nil
+	}
+
+	certAuth, err := ca.New(caConfig)
+	if err != nil {
+		return err
+	}
+
+	id, err := certAuth.GetOrCreateMeshCertID()
+	if err != nil {
+		return err
+	}
+
+	sideCarConfig.MeshCertificateID = id
+	return nil
 }
 
 func init() {

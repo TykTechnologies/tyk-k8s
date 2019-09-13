@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/TykTechnologies/tyk-k8s/logger"
+	"github.com/TykTechnologies/tyk-k8s/tyk"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/cloudflare/cfssl/api/client"
 	"github.com/cloudflare/cfssl/auth"
@@ -35,6 +36,13 @@ type Config struct {
 	MongoConnStr      string          `yaml:"mongoConnStr"`
 	Secure            bool
 	SkipCACheck       bool
+}
+
+type CertClient interface {
+	GenerateCert(string) (*Bundle, error)
+	StoreCert(*CertModel) (*CertModel, error)
+	GetCertByFingerprint(string) (*CertModel, error)
+	GetServerCertByLinkedAPIID(string) (*CertModel, error)
 }
 
 type Client struct {
@@ -63,6 +71,7 @@ type CertModel struct {
 	Expires         time.Time
 	ClientEgressIDs []string // If cert is used as a client cert, IDs of APIs it is attached to
 	ServiceID       string   // If cert is used as a server cert, ID of API it belongs to
+	IsMeshCert      bool
 }
 
 func (b *Bundle) Combine() []byte {
@@ -103,19 +112,7 @@ func (c *Client) getAuthenticatedClient() (*client.AuthRemote, error) {
 
 }
 
-func (c *Client) UnmarshalConfigIntoCSR(csrConfig []byte) (*csr.CertificateRequest, error) {
-	req := csr.New()
-
-	// Merge with the configuration supplied by the user
-	err := json.Unmarshal([]byte(csrConfig), &req)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-func (c *Client) PrepareRequest() *csr.CertificateRequest {
+func (c *Client) prepareRequest() *csr.CertificateRequest {
 	req := csr.New()
 
 	req.Names = c.CA.DefaultNames
@@ -145,8 +142,9 @@ func (c *Client) GenerateCert(CN string) (*Bundle, error) {
 	}
 
 	// Prepare a default request
-	req := c.PrepareRequest()
+	req := c.prepareRequest()
 	req.Hosts = []string{CN}
+	req.CN = CN
 
 	// API Client for CFSSL
 	rem, err := c.getAuthenticatedClient()
@@ -274,6 +272,49 @@ func (c *Client) GetServerCertByLinkedAPIID(serviceID string) (*CertModel, error
 	}
 
 	return cert, nil
+}
+
+func (c *Client) GetOrCreateMeshCertID() (string, error) {
+	m := c.storeSess.Clone()
+	foundCerts := make([]*CertModel, 0)
+	err := m.DB("").C(caCol).Find(
+		bson.M{
+			"IsMeshCert": true,
+			"Expires": bson.M{
+				"$gt": time.Now(),
+			},
+		}).Sort("-Expires").All(&foundCerts)
+	if err != nil {
+		return "", err
+	}
+
+	if len(foundCerts) > 0 {
+		// return the last expiring cert
+		return foundCerts[0].Bundle.Fingerprint, nil
+	}
+
+	// no cert, let's make one
+	bdl, err := c.GenerateCert("mesh")
+	if err != nil {
+		return "", err
+	}
+
+	// Store it
+	id, err := tyk.CreateCertificate(bdl.Certificate, bdl.PrivateKey)
+	if err != nil {
+		return "", err
+	}
+	newModel := NewCertModel(bdl)
+	newModel.Bundle.Fingerprint = id
+	newModel.IsMeshCert = true
+
+	cm, err := c.StoreCert(newModel)
+	if err != nil {
+		return "", err
+	}
+
+	return cm.Bundle.Fingerprint, nil
+
 }
 
 func NewCertModel(bundle *Bundle) *CertModel {

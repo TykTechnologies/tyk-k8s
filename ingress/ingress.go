@@ -164,7 +164,7 @@ func checkAndGetTemplate(ing *v1beta1.Ingress) string {
 		}
 	}
 
-	return tyk.DefaultTemplate
+	return tyk.DefaultIngressTemplate
 }
 
 func (c *ControlServer) doAdd(ing *v1beta1.Ingress) error {

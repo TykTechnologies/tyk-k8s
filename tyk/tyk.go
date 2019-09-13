@@ -63,15 +63,17 @@ type APIDefOptions struct {
 var cfg *TykConf
 var log = logger.GetLogger("tyk-api")
 var templates *template.Template
-var defaultTemplate *template.Template
+var defaultIngressTemplates *template.Template
 
 const (
-	DefaultTemplate = "default"
-	TemplateNameKey = "template.service.tyk.io"
+	DefaultIngressTemplate = "default"
+	DefaultMeshTemplate    = "default-mesh"
+	DefaultInboundTemplate = "default-inbound"
+	TemplateNameKey        = "template.service.tyk.io"
 )
 
 func Init(forceConf *TykConf) {
-	defaultTemplate = template.Must(template.New("default").Parse(defaultAPITemplate))
+	defaultIngressTemplates = template.Must(template.New("default").Parse(apiTemplates))
 
 	if forceConf != nil {
 		cfg = forceConf
@@ -120,16 +122,16 @@ func newClient() interfaces.UniversalClient {
 func getTemplate(name string) (*template.Template, error) {
 	if cfg.Templates == "" {
 		log.Warning("using default template")
-		return defaultTemplate, nil
+		return defaultIngressTemplates, nil
 	}
 
 	if templates == nil {
-		return defaultTemplate, errors.New("no templates loaded")
+		return defaultIngressTemplates, errors.New("no templates loaded")
 	}
 
 	tpl := templates.Lookup(name)
 	if tpl == nil {
-		return defaultTemplate, errors.New("template not found")
+		return defaultIngressTemplates, errors.New("template not found")
 	}
 
 	return tpl, nil
@@ -138,7 +140,7 @@ func getTemplate(name string) (*template.Template, error) {
 
 func TemplateService(opts *APIDefOptions) ([]byte, error) {
 	if opts.TemplateName == "" {
-		opts.TemplateName = DefaultTemplate
+		opts.TemplateName = DefaultIngressTemplate
 	}
 
 	defTpl, err := getTemplate(opts.TemplateName)
@@ -203,7 +205,7 @@ func CreateService(opts *APIDefOptions) (string, error) {
 	}
 
 	postProcessedDef := string(adBytes)
-	log.Info(postProcessedDef)
+	log.Debug(postProcessedDef)
 	if opts.Annotations != nil {
 		postProcessedDef, err = processor.Process(opts.Annotations, string(adBytes))
 		if err != nil {
@@ -381,70 +383,3 @@ func UpdateAPI(def *apidef.APIDefinition) error {
 	cl := newClient()
 	return cl.UpdateAPI(def)
 }
-
-var defaultAPITemplate = `
-{
-    "name": "{{.Name}}{{ range $i, $e := .GatewayTags }} #{{$e}}{{ end }}",
-	"slug": "{{.Slug}}",
-    "org_id": "{{.Org}}",
-    "use_keyless": true,
-    "definition": {
-        "location": "header",
-        "key": "x-api-version",
-        "strip_path": true
-    },
-    "version_data": {
-        "not_versioned": true,
-        "versions": {
-            "Default": {
-                "name": "Default",
-                "use_extended_paths": true,
-				"global_headers": {
-                    "X-Tyk-Request-ID": "$tyk_context.request_id"
-                },
-				"paths": {
-                    "ignored": [],
-                    "white_list": [],
-                    "black_list": []
-                }
-            }
-        }
-    },
-    "proxy": {
-        "listen_path": "{{.ListenPath}}",
-        "target_url": "{{.Target}}",
-        "strip_listen_path": true
-    },
-	"domain": "{{.HostName}}",
-	"response_processors": [],
-	 "custom_middleware": {
-        "pre": [],
-        "post": [],
-        "post_key_auth": [],
-        "auth_check": {
-            "name": "",
-            "path": "",
-            "require_session": false
-        },
-        "response": [],
-        "driver": "",
-        "id_extractor": {
-            "extract_from": "",
-            "extract_with": "",
-            "extractor_config": {}
-        }
-    },
-	"config_data": {},
-	"allowed_ips": [],
-    "disable_rate_limit": true,
-    "disable_quota": true,
-    "cache_options": {
-        "cache_timeout": 60,
-        "enable_cache": true
-    },
-    "active": true,
-    "tags": [{{ range $i, $e := .GatewayTags }}{{ if $i }},{{ end }}"{{ $e }}"{{ end }}],
-    "enable_context_vars": true,
-	"certificates": [{{ range $i, $e := .CertificateID }}{{ if $i }},{{ end }}"{{ $e }}"{{ end }}]
-}
-`

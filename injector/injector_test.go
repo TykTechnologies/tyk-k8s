@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/TykTechnologies/tyk-k8s/ca"
 	"github.com/TykTechnologies/tyk-k8s/tyk"
 	"github.com/TykTechnologies/tykctl/api/_test_util"
 	"github.com/ghodss/yaml"
@@ -62,6 +63,8 @@ func TestWebhookServer_Serve(t *testing.T) {
 		rec := httptest.NewRecorder()
 
 		whs.SidecarConfig.CreateRoutes = true
+		whs.SidecarConfig.EnableMeshTLS = true
+		whs.CAClient = &ca.Mock{}
 		tyk.Init(&tyk.TykConf{
 			URL:       "http://localhost:8989",
 			Secret:    "foo",

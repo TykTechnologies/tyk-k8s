@@ -36,27 +36,34 @@ var ignoredNamespaces = []string{
 }
 
 const (
-	AdmissionWebhookAnnotationInjectKey           = "injector.tyk.io/inject"
+	// Injector toggle and listen path to generate
+	AdmissionWebhookAnnotationInjectKey = "injector.tyk.io/inject"
+	admissionWebhookAnnotationRouteKey  = "injector.tyk.io/route"
+
+	// Internally used by mesh to track API IDs and state
 	AdmissionWebhookAnnotationStatusKey           = "injector.tyk.io/status"
-	admissionWebhookAnnotationRouteKey            = "injector.tyk.io/route"
 	AdmissionWebhookAnnotationInboundServiceIDKey = "injector.tyk.io/inbound-service-id"
 	AdmissionWebhookAnnotationMeshServiceIDKey    = "injector.tyk.io/mesh-service-id"
+
+	// Advanced mesh keys for group access policies TBC
 	AdmissionWebhookAnnotationGroupKey            = "injector.tyk.io/group"
 	AdmissionWebhookAnnotationAllowedCallerGroups = "injector.tyk.io/caller-access-groups"
-	meshTag                                       = "mesh"
+
+	meshTag = "mesh"
 )
 
 type WebhookServer struct {
 	SidecarConfig *Config
 	CAConfig      *ca.Config
-	CAClient      *ca.Client
+	CAClient      ca.CertClient
 }
 
 type Config struct {
-	Containers     []corev1.Container `yaml:"containers"`
-	InitContainers []corev1.Container `yaml:"initContainers"`
-	CreateRoutes   bool               `yaml:"createRoutes"`
-	EnableMeshTLS  bool               `yaml:"enableMeshTLS"`
+	Containers        []corev1.Container `yaml:"containers"`
+	InitContainers    []corev1.Container `yaml:"initContainers"`
+	CreateRoutes      bool               `yaml:"createRoutes"`
+	EnableMeshTLS     bool               `yaml:"enableMeshTLS"`
+	MeshCertificateID string             `yaml:"meshCertificateID"`
 }
 
 type namedThing struct {
@@ -127,25 +134,38 @@ func mutationRequired(ignoredList []string, metadata *metav1.ObjectMeta) bool {
 	return required
 }
 
-func addContainer(target, added []corev1.Container, basePath string) (patch []patchOperation) {
-	first := len(target) == 0
-	var value interface{}
-	for _, add := range added {
-		value = add
-		path := basePath
-		if first {
-			first = false
-			value = []corev1.Container{add}
-		} else {
-			path = path + "/-"
-		}
-		patch = append(patch, patchOperation{
-			Op:    "add",
-			Path:  path,
-			Value: value,
-		})
+func addContainer(pod *corev1.Pod, added []corev1.Container) *corev1.PodSpec {
+	spec := &pod.Spec
+	if len(spec.Containers) == 0 {
+		spec.Containers = []corev1.Container{}
 	}
-	return patch
+
+	if len(spec.HostAliases) == 0 {
+		spec.HostAliases = []corev1.HostAlias{}
+	}
+
+	spec.HostAliases = append(spec.HostAliases, corev1.HostAlias{
+		IP:        "127.0.0.1",
+		Hostnames: []string{"mesh", "mesh.local"},
+	})
+
+	for idx, _ := range added {
+		spec.Containers = append(spec.Containers, added[idx])
+	}
+
+	return spec
+}
+
+func addInitContainer(spec *corev1.PodSpec, added []corev1.Container) *corev1.PodSpec {
+	if len(spec.InitContainers) == 0 {
+		spec.InitContainers = []corev1.Container{}
+	}
+
+	for idx, _ := range added {
+		spec.InitContainers = append(spec.InitContainers, added[idx])
+	}
+
+	return spec
 }
 
 func updateAnnotation(target map[string]string, added map[string]string) (patch []patchOperation) {
@@ -190,6 +210,59 @@ func mutateService(svc *corev1.Service, basePath string, sidecarConfig *Config) 
 	return patch
 }
 
+func addVolume(spec *corev1.PodSpec, sidecarConfig *Config) *corev1.PodSpec {
+	if !sidecarConfig.EnableMeshTLS {
+		return spec
+	}
+
+	// Add the overall shared volume
+	volume := corev1.Volume{
+		Name: volName,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: volName,
+				},
+			},
+		},
+	}
+
+	if spec.Volumes == nil {
+		spec.Volumes = []corev1.Volume{}
+	}
+	spec.Volumes = append(spec.Volumes, volume)
+
+	return spec
+}
+
+var volName = "ca-pem"
+
+func injectCAVolume(spec *corev1.PodSpec, sidecarConfig *Config) *corev1.PodSpec {
+	if !sidecarConfig.EnableMeshTLS {
+		return spec
+	}
+
+	//path := fmt.Sprintf("/spec/containers")
+	for idx, _ := range spec.Containers {
+		// Add it to the containers
+		volumeMount := corev1.VolumeMount{
+			Name:      volName,
+			ReadOnly:  true,
+			MountPath: "/etc/ssl/certs/ca.pem",
+			SubPath:   "ca.pem",
+		}
+
+		// If there is no section, add
+		if spec.Containers[idx].VolumeMounts == nil {
+			log.Info("adding new mount section")
+			spec.Containers[idx].VolumeMounts = []corev1.VolumeMount{}
+		}
+		spec.Containers[idx].VolumeMounts = append(spec.Containers[idx].VolumeMounts, volumeMount)
+	}
+
+	return spec
+}
+
 // add tags to the gateway container
 const tagVarName = "TYK_GW_DBAPPCONFOPTIONS_TAGS"
 
@@ -230,20 +303,34 @@ func createPatch(pod *corev1.Pod, svc *corev1.Service, sidecarConfig *Config, an
 		return json.Marshal(patch)
 	}
 
-	patch = append(patch, addContainer(pod.Spec.Containers, preProcessContainerTpl(pod, sidecarConfig.Containers), "/spec/containers")...)
-	patch = append(patch, addContainer(pod.Spec.InitContainers, sidecarConfig.InitContainers, "/spec/initContainers")...)
+	spec := addContainer(pod, preProcessContainerTpl(pod, sidecarConfig.Containers))
+	spec = addInitContainer(spec, sidecarConfig.InitContainers)
+	spec = addVolume(spec, sidecarConfig)
+	spec = injectCAVolume(spec, sidecarConfig)
+
+	patch = append(patch, patchOperation{
+		Op:    "replace",
+		Path:  "/spec",
+		Value: spec,
+	})
+
 	patch = append(patch, updateAnnotation(pod.Annotations, annotations)...)
+
 	return json.Marshal(patch)
 }
 
-func checkAndGetTemplate(pd *corev1.Pod) string {
+func checkAndGetTemplate(pd *corev1.Pod, isMesh bool) string {
 	for k, v := range pd.Annotations {
 		if k == tyk.TemplateNameKey {
 			return v
 		}
 	}
 
-	return tyk.DefaultTemplate
+	if isMesh {
+		return tyk.DefaultMeshTemplate
+	}
+
+	return tyk.DefaultInboundTemplate
 }
 
 // create service routes
@@ -270,7 +357,7 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespa
 		Slug:         slugID,
 		Target:       "http://localhost:6767",
 		ListenPath:   "/",
-		TemplateName: checkAndGetTemplate(pod),
+		TemplateName: checkAndGetTemplate(pod, false),
 		Hostname:     hName,
 		Name:         slugID,
 		Tags:         []string{sName},
@@ -311,12 +398,13 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespa
 
 	meshID := ""
 	meshSlugID := sName + "-mesh"
+	//meshHostName := fmt.Sprintf("%s.mesh", sName)
 	meshOpts := &tyk.APIDefOptions{
 		Slug:         meshSlugID,
 		Target:       tgt,
 		ListenPath:   listenPath,
-		TemplateName: checkAndGetTemplate(pod),
-		Hostname:     "",
+		TemplateName: checkAndGetTemplate(pod, true),
+		Hostname:     "mesh",
 		Name:         meshSlugID,
 		Tags:         []string{meshTag},
 	}
@@ -338,24 +426,36 @@ func createServiceRoutes(pod *corev1.Pod, annotations map[string]string, namespa
 	return annotations, nil
 }
 
-func (whsvr *WebhookServer) generateStoreAndRegisterInboundCert(ingressID string) error {
-	serverCert, err := whsvr.generateServerCert(ingressID)
-	if err != nil {
-		return fmt.Errorf("can't generate certificate: %v", err)
-	}
-	log.Info("MeshTLS: generated server certificate")
+func (whsvr *WebhookServer) generateStoreAndRegisterCertForAPIDef(sid string, byoCert string) error {
+	// Allow us to just manually set a cert ID
+	certID := byoCert
+	if byoCert == "" {
+		certID = ""
+		serverCert, err := whsvr.generateServerCert(sid)
+		if err != nil {
+			return fmt.Errorf("can't generate certificate: %v", err)
+		}
+		log.Info("MeshTLS: generated server certificate")
 
-	aDef, err := tyk.GetByObjectID(ingressID)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve ingress API definition: %v", err)
+		certID, err = tyk.CreateCertificate(serverCert.Bundle.Certificate, serverCert.Bundle.PrivateKey)
+		if err != nil {
+			return fmt.Errorf("failed to upload certificate to tyk secure store: %v", err)
+		}
+		log.Info("MeshTLS: uploaded certificate to tyk secure store")
+		serverCert.Bundle.Fingerprint = certID
+
+		log.Info("MeshTLS: updated API definition to use new cert fingerprint")
+		_, err = whsvr.CAClient.StoreCert(serverCert)
+		if err != nil {
+			return fmt.Errorf("failed to store certificate reference in controller store: %v", err)
+		}
+		log.Info("MeshTLS: stored new certificate in mongo")
 	}
 
-	certID, err := tyk.CreateCertificate(serverCert.Bundle.Certificate, serverCert.Bundle.PrivateKey)
+	aDef, err := tyk.GetByObjectID(sid)
 	if err != nil {
-		return fmt.Errorf("failed to upload certificate to tyk secure store: %v", err)
+		return fmt.Errorf("failed to retrieve API definition: %v", err)
 	}
-	log.Info("MeshTLS: uploaded certificate to tyk secure store")
-	serverCert.Bundle.Fingerprint = certID
 
 	if len(aDef.Certificates) == 0 {
 		aDef.Certificates = make([]string, 0)
@@ -364,15 +464,8 @@ func (whsvr *WebhookServer) generateStoreAndRegisterInboundCert(ingressID string
 	aDef.Certificates = append(aDef.Certificates, certID)
 	err = tyk.UpdateAPI(&aDef.APIDefinition)
 	if err != nil {
-		return fmt.Errorf("failed to store updated API Definition: %v", err)
+		return fmt.Errorf("failed to store updated API Definition (%v): %v", aDef.Id.Hex(), err)
 	}
-	log.Info("MeshTLS: updated API definition to use new cert fingerprint")
-
-	_, err = whsvr.CAClient.StoreCert(serverCert)
-	if err != nil {
-		return fmt.Errorf("failed to store certificate reference in controller store: %v", err)
-	}
-	log.Info("MeshTLS: stored new certificate in mongo")
 
 	return nil
 }
@@ -399,7 +492,18 @@ func (whsvr *WebhookServer) handleMeshTLS(ann map[string]string) error {
 
 	// Handle inbound ID first as that's a straight TLS cert
 	log.Info("MeshTLS: starting last-mile TLS generation")
-	err := whsvr.generateStoreAndRegisterInboundCert(ingressID)
+	err := whsvr.generateStoreAndRegisterCertForAPIDef(ingressID, "")
+	if err != nil {
+		return err
+	}
+
+	// we add a cert for https://mesh so that we can guarantee TLS all the way through
+	meshID, ok := ann[AdmissionWebhookAnnotationMeshServiceIDKey]
+	if !ok {
+		return fmt.Errorf("can't generate server cert without an mesh API ID")
+	}
+
+	err = whsvr.generateStoreAndRegisterCertForAPIDef(meshID, whsvr.SidecarConfig.MeshCertificateID)
 	if err != nil {
 		return err
 	}

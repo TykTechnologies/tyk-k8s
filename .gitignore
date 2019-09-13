@@ -1,3 +1,5 @@
 tyk-k8s
 tyk-k8s.yaml
 docker/cfssl-k8s/ca-quickstart/
+make-docker.sh
+push-docker.sh

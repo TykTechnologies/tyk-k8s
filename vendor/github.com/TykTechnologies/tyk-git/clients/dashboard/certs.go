@@ -47,7 +47,7 @@ func (c *Client) CreateCertificate(cert []byte) (string, error) {
 	}
 
 	if strings.ToLower(dbResp.Status) != "ok" {
-		return "", fmt.Errorf("API request completed, but with error: %v", dbResp.Message)
+		return "", fmt.Errorf("API request completed, but with error: %v, status: %v", dbResp.Message, dbResp.Status)
 	}
 
 	return dbResp.Id, nil
