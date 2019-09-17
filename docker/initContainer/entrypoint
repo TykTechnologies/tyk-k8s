@@ -2,6 +2,7 @@
 
 set -ex
 
+cp /var/tmp/* /usr/local/share/ca-certificates && update-ca-certificates && cp /etc/ssl/certs/* /tmp/
 iptables -t nat -A OUTPUT -p tcp --dport 80 -j DNAT --to-destination 127.0.0.1:8080
 iptables -t nat -A OUTPUT -p tcp --dport 443 -j DNAT --to-destination 127.0.0.1:8080
 iptables -t nat -A OUTPUT -p tcp --dport 6767 -j DNAT --to-destination 127.0.0.1:80

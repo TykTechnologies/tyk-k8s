@@ -7,6 +7,8 @@ LABEL Description="iptables configurator" \
       Vendor="Tyk Technologies"     	  \
       Version="1.0"
 
+RUN apk add --update ca-certificates openssl
+
 COPY entrypoint /
 
 ENTRYPOINT [ "/entrypoint" ]

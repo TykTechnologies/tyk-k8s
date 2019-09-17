@@ -17,6 +17,6 @@ spec:
     spec:
       containers:
       - name: sleep
-        image: tutum/curl
+        image: tykio/curl
         command: ["/bin/sleep","infinity"]
         imagePullPolicy: IfNotPresent

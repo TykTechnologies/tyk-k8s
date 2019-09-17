@@ -19,6 +19,7 @@ import (
 	"github.com/globalsign/mgo"
 	uuid "github.com/satori/go.uuid"
 	"gopkg.in/mgo.v2/bson"
+	"io/ioutil"
 	"time"
 )
 
@@ -34,6 +35,7 @@ type Config struct {
 	DefaultNames      []csr.Name      `yaml:"defaultNames"`
 	DefaultKeyRequest *csr.KeyRequest `yaml:"defaultKeyRequest"`
 	MongoConnStr      string          `yaml:"mongoConnStr"`
+	CertPath          string          `yaml:"certPath"`
 	Secure            bool
 	SkipCACheck       bool
 }
@@ -49,6 +51,7 @@ type Client struct {
 	CA        *Config
 	storeInit bool
 	storeSess *mgo.Session
+	caCert    []byte
 }
 
 type APICertSignRequest struct {
@@ -59,6 +62,7 @@ type APICertSignRequest struct {
 type Bundle struct {
 	PrivateKey  []byte
 	Certificate []byte
+	Bundled     []byte
 	Fingerprint string // Hash of cert for identification
 }
 
@@ -87,7 +91,19 @@ func New(cfg *Config) (*Client, error) {
 		CA: cfg,
 	}
 
-	err := c.initStorage()
+	log.Info(cfg)
+	if cfg.CertPath == "" {
+		return nil, fmt.Errorf("root CA certificate is required for bundling")
+	}
+
+	f, err := ioutil.ReadFile(cfg.CertPath)
+	if err != nil {
+		return nil, err
+	}
+
+	c.caCert = f
+
+	err = c.initStorage()
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +201,11 @@ func (c *Client) GenerateCert(CN string) (*Bundle, error) {
 		return nil, err
 	}
 
-	cpb, _ := pem.Decode(cert)
+	bundled := make([]byte, 0)
+	bundled = append(bundled, cert...)
+	bundled = append(bundled, c.caCert...)
+
+	cpb, _ := pem.Decode(bundled)
 	cObj, e := x509.ParseCertificate(cpb.Bytes)
 	if e != nil {
 		return nil, e
@@ -194,7 +214,7 @@ func (c *Client) GenerateCert(CN string) (*Bundle, error) {
 	var certSHA string
 	certSHA = certs.HexSHA256(cObj.Raw)
 
-	return &Bundle{PrivateKey: pKey, Certificate: cert, Fingerprint: certSHA}, nil
+	return &Bundle{PrivateKey: pKey, Certificate: cert, Fingerprint: certSHA, Bundled: bundled}, nil
 }
 
 func (c *Client) getPrivateKeyAsPem(pKey crypto.PrivateKey, kr *csr.KeyRequest) ([]byte, error) {

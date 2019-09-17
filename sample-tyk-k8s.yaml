@@ -1,0 +1,101 @@
+# This section defines the mutation webhook behaviour.
+# It must be TLS enabled and have a valid certificate,
+# the helm installer should take care of this for you.
+Server:
+  addr: ":443"
+  certFile: "/etc/tyk-k8s/certs/cert.pem"
+  keyFile: "/etc/tyk-k8s/certs/key.pem"
+
+# This section outlines how to connect to the Tyk dashboard API
+Tyk:
+  url: "http://dashboard.default:3000"
+  secret: "set-by-env"
+  org: "set-by-env"
+
+# If last-mile TLS is enabled, this section defines the Certificate Authority
+# behaviour, you can use the documentation for CFSSL to better understand what
+# the options here do as they are a direct map.
+CA:
+  addr: "http://cfssl-svc.default"
+  key: "CHANGEME"
+
+  # The path to the CA certificate, this is required for injecting into pods
+  # so the CA is trusted
+  certPath: "/etc/tyk-cert/ca.pem"
+
+  # This is the data that will appear in your certificates for
+  # the certificate holder, CA settings are configured directly in the CFSSL pod
+  defaultNames:
+    - C: "GB"
+      L: "London"
+      O: "Tyk Technologies Ltd."
+      OU: "Bleeding Edge Services"
+      ST: "England"
+
+  # Defines the algo and key size to use, only RSA has been tested so far
+  defaultKeyRequest:
+    A: "rsa"
+    S: 4096
+
+  # Certificates and keys are stored in MongoDB to track expiry and certificate
+  # history, you can use the same settings as the dashboard for this section for simplicity
+  mongoConnStr: "mongodb://mongodb-mongodb-replicaset.mongodb:27017/tyk-dashboard"
+
+# The injector section outlines the behaviour of the sidecar injector and mutation service
+Injector:
+
+  # Create service routes in the dashboard for new services in a mesh
+  createRoutes: true
+
+  # Generate SSL certificates for last-mile TLS
+  enableMeshTLS: true
+
+  # Leave blank to have auto-created by the injector, otherwise can be overriden by setting the ID here
+  meshCertificateID: ""
+
+  # This section outlines the configuration for the side-car container,
+  # it should need to be modified except for the secrets, if they have
+  # not already been set by the helm chart
+  containers:
+    - name: tyk-mesh
+      image: tykio/tyk-sidecar:2.8.4
+      imagePullPolicy: Always
+      env:
+        - name: REDIGOCLUSTER_SHARDCOUNT
+          value: "128"
+        - name: TYK_GW_STORAGE_HOSTS
+          value: "redis-redis.redis:6379"
+        - name: TYK_GW_STORAGE_USESSL
+          value: "false"
+        - name: TYK_GW_DBAPPCONFOPTIONS_CONNECTIONSTRING
+          value: "http://dashboard-svc-torpid-penguin-tyk-pro.default:3000"
+        - name: TYK_GW_POLICIES_POLICYCONNECTIONSTRING
+          value: "http://dashboard-svc-torpid-penguin-tyk-pro.default:3000"
+        - name: TYK_GW_SECRET
+          value: "CHANGEME"
+        - name: TYK_GW_NODESECRET
+          value: "CHANGEME"
+        - name: TYK_GW_ENABLECUSTOMDOMAINS
+          value: "true"
+        - name: TYK_GW_HTTPSERVEROPTIONS_USESSL
+          value: "true"
+      command: ["/opt/tyk-gateway/tyk", "--conf=/opt/tyk-gateway/tyk.conf"]
+      workingDir: /opt/tyk-gateway
+      ports:
+        - containerPort: 8080
+
+  # This section is te initialisation environment for a meshed pod,
+  # this shouldn't be modified at all unless you know exactly what you are up to
+  initContainers:
+    - image: tykio/tyk-k8s-init
+      imagePullPolicy: Always
+      name: run-iptables
+      securityContext:
+        privileged: true
+      command:
+        - "/entrypoint"
+      volumeMounts:
+        - mountPath: /var/tmp
+          name: ca-pem
+        - mountPath: /tmp/
+          name: ssl-certs

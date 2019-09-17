@@ -227,15 +227,24 @@ func addVolume(spec *corev1.PodSpec, sidecarConfig *Config) *corev1.PodSpec {
 		},
 	}
 
+	sslCerts := corev1.Volume{
+		Name: certVolumenName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+
 	if spec.Volumes == nil {
 		spec.Volumes = []corev1.Volume{}
 	}
 	spec.Volumes = append(spec.Volumes, volume)
+	spec.Volumes = append(spec.Volumes, sslCerts)
 
 	return spec
 }
 
 var volName = "ca-pem"
+var certVolumenName = "ssl-certs"
 
 func injectCAVolume(spec *corev1.PodSpec, sidecarConfig *Config) *corev1.PodSpec {
 	if !sidecarConfig.EnableMeshTLS {
@@ -244,12 +253,25 @@ func injectCAVolume(spec *corev1.PodSpec, sidecarConfig *Config) *corev1.PodSpec
 
 	//path := fmt.Sprintf("/spec/containers")
 	for idx, _ := range spec.Containers {
-		// Add it to the containers
+		//// Add it to the containers
+		//volumeMount := corev1.VolumeMount{
+		//	Name:      volName,
+		//	ReadOnly:  true,
+		//	MountPath: "/etc/ssl/certs/ca.pem",
+		//	SubPath:   "ca.pem",
+		//}
+		//
+		//volumeMount2 := corev1.VolumeMount{
+		//	Name:      volName,
+		//	ReadOnly:  true,
+		//	MountPath: "/usr/local/share/ca-certificates/ca.pem",
+		//	SubPath:   "ca.pem",
+		//}
+
+		// Mount SSL certs from the init container
 		volumeMount := corev1.VolumeMount{
-			Name:      volName,
-			ReadOnly:  true,
-			MountPath: "/etc/ssl/certs/ca.pem",
-			SubPath:   "ca.pem",
+			Name:      certVolumenName,
+			MountPath: "/etc/ssl/certs",
 		}
 
 		// If there is no section, add
@@ -258,6 +280,8 @@ func injectCAVolume(spec *corev1.PodSpec, sidecarConfig *Config) *corev1.PodSpec
 			spec.Containers[idx].VolumeMounts = []corev1.VolumeMount{}
 		}
 		spec.Containers[idx].VolumeMounts = append(spec.Containers[idx].VolumeMounts, volumeMount)
+
+		//spec.Containers[idx].VolumeMounts = append(spec.Containers[idx].VolumeMounts, volumeMount2)
 	}
 
 	return spec
@@ -437,7 +461,7 @@ func (whsvr *WebhookServer) generateStoreAndRegisterCertForAPIDef(sid string, by
 		}
 		log.Info("MeshTLS: generated server certificate")
 
-		certID, err = tyk.CreateCertificate(serverCert.Bundle.Certificate, serverCert.Bundle.PrivateKey)
+		certID, err = tyk.CreateCertificate(serverCert.Bundle.Bundled, serverCert.Bundle.PrivateKey)
 		if err != nil {
 			return fmt.Errorf("failed to upload certificate to tyk secure store: %v", err)
 		}
