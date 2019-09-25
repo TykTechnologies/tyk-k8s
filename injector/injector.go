@@ -253,21 +253,6 @@ func injectCAVolume(spec *corev1.PodSpec, sidecarConfig *Config) *corev1.PodSpec
 
 	//path := fmt.Sprintf("/spec/containers")
 	for idx, _ := range spec.Containers {
-		//// Add it to the containers
-		//volumeMount := corev1.VolumeMount{
-		//	Name:      volName,
-		//	ReadOnly:  true,
-		//	MountPath: "/etc/ssl/certs/ca.pem",
-		//	SubPath:   "ca.pem",
-		//}
-		//
-		//volumeMount2 := corev1.VolumeMount{
-		//	Name:      volName,
-		//	ReadOnly:  true,
-		//	MountPath: "/usr/local/share/ca-certificates/ca.pem",
-		//	SubPath:   "ca.pem",
-		//}
-
 		// Mount SSL certs from the init container
 		volumeMount := corev1.VolumeMount{
 			Name:      certVolumenName,
@@ -280,8 +265,6 @@ func injectCAVolume(spec *corev1.PodSpec, sidecarConfig *Config) *corev1.PodSpec
 			spec.Containers[idx].VolumeMounts = []corev1.VolumeMount{}
 		}
 		spec.Containers[idx].VolumeMounts = append(spec.Containers[idx].VolumeMounts, volumeMount)
-
-		//spec.Containers[idx].VolumeMounts = append(spec.Containers[idx].VolumeMounts, volumeMount2)
 	}
 
 	return spec

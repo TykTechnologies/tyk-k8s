@@ -412,18 +412,6 @@ func (c *ControlServer) handlePodDeleteForMesh(pd *v1.Pod) {
 	}
 	log.Info("found ", len(remPds.Items), " in namespace")
 
-	var v string
-	rem := false
-	for _, pds := range remPds.Items {
-		v, rem = pds.Annotations[injector.AdmissionWebhookAnnotationStatusKey]
-		if rem {
-			if v == "injected" {
-				log.Info("still pods remaining, not deleting routes")
-				return
-			}
-		}
-	}
-
 	// Last pod
 	serviceID, ok := pd.Annotations[injector.AdmissionWebhookAnnotationInboundServiceIDKey]
 	if !ok {
@@ -435,6 +423,19 @@ func (c *ControlServer) handlePodDeleteForMesh(pd *v1.Pod) {
 	if !ok {
 		log.Error("mesh ID not found in annotations, skipping cleanup")
 		return
+	}
+
+	var sid, mid string
+	serviceIDFound, meshIDFound := false, false
+	for _, pds := range remPds.Items {
+		sid, serviceIDFound = pds.Annotations[injector.AdmissionWebhookAnnotationInboundServiceIDKey]
+		mid, meshIDFound = pds.Annotations[injector.AdmissionWebhookAnnotationMeshServiceIDKey]
+		if serviceIDFound && meshIDFound {
+			if (sid == serviceID) && (mid == meshID) {
+				log.Info("pods still remaining for mesh set, not deleting routes until final pod")
+				return
+			}
+		}
 	}
 
 	log.Info("deleting...")

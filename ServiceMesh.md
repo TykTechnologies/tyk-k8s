@@ -325,4 +325,3 @@ This software is provided as is and the mesh functionality is still in the early
 ## TODO:
 - [x] Auto-inject the CA root to services
 - [ ] Automatic certificate renewal and rotation
-- [ ] Mutual TLS grants
