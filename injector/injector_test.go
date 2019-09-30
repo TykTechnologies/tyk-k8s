@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"io/ioutil"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/TykTechnologies/tyk-k8s/ca"
 	"github.com/TykTechnologies/tyk-k8s/tyk"
 	"github.com/TykTechnologies/tykctl/api/_test_util"
 	"github.com/ghodss/yaml"
-	"io/ioutil"
-	"net/http/httptest"
-	"testing"
 )
 
 func TestWebhookServer_Serve(t *testing.T) {
@@ -41,7 +42,7 @@ func TestWebhookServer_Serve(t *testing.T) {
 			AdmissionReviewJson,
 			200,
 			true,
-			3,
+			2,
 		},
 		{
 			AdmissionReviewJsonSkip,
