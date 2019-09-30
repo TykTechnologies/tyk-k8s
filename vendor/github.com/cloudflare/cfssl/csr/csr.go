@@ -36,7 +36,6 @@ type Name struct {
 	O            string `json:"O,omitempty" yaml:"O,omitempty"`   // OrganisationName
 	OU           string `json:"OU,omitempty" yaml:"OU,omitempty"` // OrganisationalUnitName
 	SerialNumber string `json:"SerialNumber,omitempty" yaml:"SerialNumber,omitempty"`
-	E string `json:"E,omitempty" yaml:"E,omitempty"`   // Email
 }
 
 // A KeyRequest contains the algorithm and key size for a new private key.
@@ -159,7 +158,6 @@ func appendIf(s string, a *[]string) {
 // Name returns the PKIX name for the request.
 func (cr *CertificateRequest) Name() pkix.Name {
 	var name pkix.Name
-	var oidEmailAddress = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 1}
 	name.CommonName = cr.CN
 
 	for _, n := range cr.Names {
@@ -168,13 +166,6 @@ func (cr *CertificateRequest) Name() pkix.Name {
 		appendIf(n.L, &name.Locality)
 		appendIf(n.O, &name.Organization)
 		appendIf(n.OU, &name.OrganizationalUnit)
-		if n.E != "" {
-			if len (name.ExtraNames) > 0 {
-				name.ExtraNames = append(name.ExtraNames, pkix.AttributeTypeAndValue{
-					Type: oidEmailAddress, Value: n.E})
-			}
-			log.Info("ADDING EMAIL AS ENAME")
-		}
 	}
 	name.SerialNumber = cr.SerialNumber
 	return name

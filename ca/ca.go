@@ -18,7 +18,7 @@ import (
 	"github.com/cloudflare/cfssl/csr"
 	"github.com/globalsign/mgo"
 	uuid "github.com/satori/go.uuid"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/globalsign/mgo/bson"
 	"io/ioutil"
 	"time"
 )

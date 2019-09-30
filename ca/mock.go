@@ -2,7 +2,7 @@ package ca
 
 import (
 	uuid "github.com/satori/go.uuid"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/globalsign/mgo/bson"
 	"time"
 )
 
