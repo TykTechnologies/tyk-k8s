@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
@@ -28,7 +30,7 @@ import (
 type RequestOptions struct {
 
 	// Data is a map of key values that will eventually convert into the
-	// query string of a GET request or the body of a POST request.
+	// the body of a POST request.
 	Data map[string]string
 
 	// Params is a map of query strings that may be used within a GET request
@@ -128,6 +130,11 @@ type RequestOptions struct {
 
 	// Context can be used to maintain state between requests https://golang.org/pkg/context/#Context
 	Context context.Context
+
+	// BeforeRequest is a hook that can be used to modify the request object
+	// before the request has been fired. This is useful for adding authentication
+	// and other functionality not provided in this library
+	BeforeRequest func(req *http.Request) error
 }
 
 func doRegularRequest(requestVerb, url string, ro *RequestOptions) (*Response, error) {
@@ -136,6 +143,12 @@ func doRegularRequest(requestVerb, url string, ro *RequestOptions) (*Response, e
 
 func doSessionRequest(requestVerb, url string, ro *RequestOptions, httpClient *http.Client) (*Response, error) {
 	return buildResponse(buildRequest(requestVerb, url, ro, httpClient))
+}
+
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+
+func escapeQuotes(s string) string {
+	return quoteEscaper.Replace(s)
 }
 
 // buildRequest is where most of the magic happens for request processing
@@ -181,6 +194,12 @@ func buildRequest(httpMethod, url string, ro *RequestOptions, httpClient *http.C
 
 	if ro.Context != nil {
 		req = req.WithContext(ro.Context)
+	}
+
+	if ro.BeforeRequest != nil {
+		if err := ro.BeforeRequest(req); err != nil {
+			return nil, err
+		}
 	}
 
 	return httpClient.Do(req)
@@ -281,7 +300,20 @@ func createMultiPartPostRequest(httpMethod, userURL string, ro *RequestOptions) 
 			}
 		}
 
-		writer, err := multipartWriter.CreateFormFile(fieldName, f.FileName)
+		var writer io.Writer
+		var err error
+
+		if f.FileMime != "" {
+			if f.FileName == "" {
+				f.FileName = "filename"
+			}
+			h := make(textproto.MIMEHeader)
+			h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, escapeQuotes(fieldName), escapeQuotes(f.FileName)))
+			h.Set("Content-Type", f.FileMime)
+			writer, err = multipartWriter.CreatePart(h)
+		} else {
+			writer, err = multipartWriter.CreateFormFile(fieldName, f.FileName)
+		}
 
 		if err != nil {
 			return nil, err
@@ -291,7 +323,9 @@ func createMultiPartPostRequest(httpMethod, userURL string, ro *RequestOptions) 
 			return nil, err
 		}
 
-		f.FileContents.Close()
+		if err := f.FileContents.Close(); err != nil {
+			return nil, err
+		}
 
 	}
 
