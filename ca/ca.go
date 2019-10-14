@@ -26,7 +26,7 @@ import (
 var log = logger.GetLogger("tyk-ca")
 
 const (
-	caCol string = "k8s_ca"
+	CACol string = "k8s_ca"
 )
 
 type Config struct {
@@ -45,6 +45,7 @@ type CertClient interface {
 	StoreCert(*CertModel) (*CertModel, error)
 	GetCertByFingerprint(string) (*CertModel, error)
 	GetServerCertByLinkedAPIID(string) (*CertModel, error)
+	GetStore() *mgo.Session
 }
 
 type Client struct {
@@ -111,6 +112,10 @@ func New(cfg *Config) (*Client, error) {
 	return c, nil
 }
 
+func (c *Client) GetStore() *mgo.Session {
+	return c.storeSess
+}
+
 func (c *Client) getAuthenticatedClient() (*client.AuthRemote, error) {
 	var tlsOptions *tls.Config
 	if c.CA.Secure {
@@ -149,6 +154,8 @@ func (c *Client) prepareRequest() *csr.CertificateRequest {
 		req.KeyRequest = csr.NewKeyRequest()
 	}
 
+	// set expiry
+	req.CA.Expiry = time.Now().Add((time.Hour * 24) * 30).String()
 	return req
 }
 
@@ -265,7 +272,7 @@ func (c *Client) StoreCert(cert *CertModel) (*CertModel, error) {
 		cert.MID = bson.NewObjectId()
 	}
 
-	return cert, m.DB("").C(caCol).Insert(cert)
+	return cert, m.DB("").C(CACol).Insert(cert)
 }
 
 func (c *Client) GetCertByFingerprint(fp string) (*CertModel, error) {
@@ -273,7 +280,7 @@ func (c *Client) GetCertByFingerprint(fp string) (*CertModel, error) {
 	defer m.Close()
 
 	cert := &CertModel{}
-	err := m.DB("").C(caCol).Find(bson.M{"Bundle.Fingerprint": fp}).One(cert)
+	err := m.DB("").C(CACol).Find(bson.M{"Bundle.Fingerprint": fp}).One(cert)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +293,7 @@ func (c *Client) GetServerCertByLinkedAPIID(serviceID string) (*CertModel, error
 	defer m.Close()
 
 	cert := &CertModel{}
-	err := m.DB("").C(caCol).Find(bson.M{"ServiceID": serviceID}).One(cert)
+	err := m.DB("").C(CACol).Find(bson.M{"ServiceID": serviceID}).One(cert)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +304,7 @@ func (c *Client) GetServerCertByLinkedAPIID(serviceID string) (*CertModel, error
 func (c *Client) GetOrCreateMeshCertID() (string, error) {
 	m := c.storeSess.Clone()
 	foundCerts := make([]*CertModel, 0)
-	err := m.DB("").C(caCol).Find(
+	err := m.DB("").C(CACol).Find(
 		bson.M{
 			"IsMeshCert": true,
 			"Expires": bson.M{

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/TykTechnologies/tyk-k8s/ca"
+	cert_rotate "github.com/TykTechnologies/tyk-k8s/cert-rotate"
 	"github.com/TykTechnologies/tyk-k8s/logger"
 	"github.com/TykTechnologies/tyk-k8s/tyk"
 	"io/ioutil"
@@ -56,6 +57,7 @@ type WebhookServer struct {
 	SidecarConfig *Config
 	CAConfig      *ca.Config
 	CAClient      ca.CertClient
+	CertManager   *cert_rotate.Manager
 }
 
 type Config struct {
@@ -534,7 +536,10 @@ func (whsvr *WebhookServer) generateServerCert(id string) (*ca.CertModel, error)
 		return nil, err
 	}
 
-	return ca.NewCertModel(bdl), nil
+	nCertModel := ca.NewCertModel(bdl)
+	nCertModel.ServiceID = id
+
+	return nCertModel, nil
 }
 
 func (whsvr *WebhookServer) processPodMutations(ar *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {

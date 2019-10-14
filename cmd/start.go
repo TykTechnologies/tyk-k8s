@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/TykTechnologies/tyk-k8s/ca"
+	cert_rotate "github.com/TykTechnologies/tyk-k8s/cert-rotate"
 	"github.com/TykTechnologies/tyk-k8s/ingress"
 	"github.com/TykTechnologies/tyk-k8s/injector"
 	"github.com/TykTechnologies/tyk-k8s/logger"
@@ -53,6 +54,7 @@ var startCmd = &cobra.Command{
 			CAConfig:      caConf,
 		}
 
+		var rotationMgr *cert_rotate.Manager
 		if whConf.EnableMeshTLS {
 			caClient, err := ca.New(caConf)
 			if err != nil {
@@ -60,6 +62,13 @@ var startCmd = &cobra.Command{
 			}
 
 			whs.CAClient = caClient
+
+			rotationMgr, err = cert_rotate.New(caClient.GetStore())
+			if err != nil {
+				log.Fatal("failed to start cert rotation manager: ", err)
+			}
+
+			rotationMgr.StartCheckLoop()
 		}
 
 		webserver.Server().AddRoute("POST", "/inject", whs.Serve)
@@ -76,6 +85,11 @@ var startCmd = &cobra.Command{
 		log.Info("web server started")
 
 		WaitForCtrlC()
+
+		// stop cert rotation process
+		if rotationMgr != nil {
+			rotationMgr.StopCheckLoop()
+		}
 
 		err = webserver.Server().Stop()
 		if err != nil {
