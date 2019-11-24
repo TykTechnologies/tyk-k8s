@@ -42,10 +42,11 @@ const (
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
 
-	OttoDriver   MiddlewareDriver = "otto"
-	PythonDriver MiddlewareDriver = "python"
-	LuaDriver    MiddlewareDriver = "lua"
-	GrpcDriver   MiddlewareDriver = "grpc"
+	OttoDriver     MiddlewareDriver = "otto"
+	PythonDriver   MiddlewareDriver = "python"
+	LuaDriver      MiddlewareDriver = "lua"
+	GrpcDriver     MiddlewareDriver = "grpc"
+	GoPluginDriver MiddlewareDriver = "goplugin"
 
 	BodySource        IdExtractorSource = "body"
 	HeaderSource      IdExtractorSource = "header"
@@ -81,6 +82,12 @@ type EndpointMethodMeta struct {
 type EndPointMeta struct {
 	Path          string                        `bson:"path" json:"path"`
 	MethodActions map[string]EndpointMethodMeta `bson:"method_actions" json:"method_actions"`
+}
+
+type CacheMeta struct {
+	Method        string `bson:"method" json:"method"`
+	Path          string `bson:"path" json:"path"`
+	CacheKeyRegex string `bson:"cache_key_regex" json:"cache_key_regex"`
 }
 
 type RequestInputType string
@@ -144,6 +151,7 @@ type CircuitBreakerMeta struct {
 
 type StringRegexMap struct {
 	MatchPattern string `bson:"match_rx" json:"match_rx"`
+	Reverse      bool   `bson:"reverse" json:"reverse"`
 	matchRegex   *regexp.Regexp
 }
 
@@ -168,7 +176,7 @@ type URLRewriteMeta struct {
 	MatchPattern string           `bson:"match_pattern" json:"match_pattern"`
 	RewriteTo    string           `bson:"rewrite_to" json:"rewrite_to"`
 	Triggers     []RoutingTrigger `bson:"triggers" json:"triggers"`
-	MatchRegexp  *regexp.Regexp
+	MatchRegexp  *regexp.Regexp   `json:"-"`
 }
 
 type VirtualMeta struct {
@@ -202,6 +210,7 @@ type ExtendedPathsSet struct {
 	WhiteList               []EndPointMeta        `bson:"white_list" json:"white_list,omitempty"`
 	BlackList               []EndPointMeta        `bson:"black_list" json:"black_list,omitempty"`
 	Cached                  []string              `bson:"cache" json:"cache,omitempty"`
+	AdvanceCacheConfig      []CacheMeta           `bson:"advance_cache_config" json:"advance_cache_config,omitempty"`
 	Transform               []TemplateMeta        `bson:"transform" json:"transform,omitempty"`
 	TransformResponse       []TemplateMeta        `bson:"transform_response" json:"transform_response,omitempty"`
 	TransformJQ             []TransformJQMeta     `bson:"transform_jq" json:"transform_jq,omitempty"`
@@ -217,7 +226,7 @@ type ExtendedPathsSet struct {
 	TrackEndpoints          []TrackEndpointMeta   `bson:"track_endpoints" json:"track_endpoints,omitempty"`
 	DoNotTrackEndpoints     []TrackEndpointMeta   `bson:"do_not_track_endpoints" json:"do_not_track_endpoints,omitempty"`
 	ValidateJSON            []ValidatePathMeta    `bson:"validate_json" json:"validate_json,omitempty"`
-	Internal                []InternalMeta        `bson:"internal" json:"internal"`
+	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 }
 
 type VersionInfo struct {
@@ -262,6 +271,7 @@ type MiddlewareDefinition struct {
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
+	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
 }
 
 type MiddlewareIdExtractor struct {
@@ -296,10 +306,19 @@ type ResponseProcessor struct {
 }
 
 type HostCheckObject struct {
-	CheckURL string            `bson:"url" json:"url"`
-	Method   string            `bson:"method" json:"method"`
-	Headers  map[string]string `bson:"headers" json:"headers"`
-	Body     string            `bson:"body" json:"body"`
+	CheckURL            string            `bson:"url" json:"url"`
+	Protocol            string            `bson:"protocol" json:"protocol"`
+	Timeout             time.Duration     `bson:"timeout" json:"timeout"`
+	EnableProxyProtocol bool              `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	Commands            []CheckCommand    `bson:"commands" json:"commands"`
+	Method              string            `bson:"method" json:"method"`
+	Headers             map[string]string `bson:"headers" json:"headers"`
+	Body                string            `bson:"body" json:"body"`
+}
+
+type CheckCommand struct {
+	Name    string `bson:"name" json:"name"`
+	Message string `bson:"message" json:"message"`
 }
 
 type ServiceDiscoveryConfiguration struct {
@@ -326,17 +345,22 @@ type OpenIDOptions struct {
 }
 
 // APIDefinition represents the configuration for a single proxied API and it's versions.
+//
+// swagger:model
 type APIDefinition struct {
-	Id               bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
-	Name             string        `bson:"name" json:"name"`
-	Slug             string        `bson:"slug" json:"slug"`
-	APIID            string        `bson:"api_id" json:"api_id"`
-	OrgID            string        `bson:"org_id" json:"org_id"`
-	UseKeylessAccess bool          `bson:"use_keyless" json:"use_keyless"`
-	UseOauth2        bool          `bson:"use_oauth2" json:"use_oauth2"`
-	UseOpenID        bool          `bson:"use_openid" json:"use_openid"`
-	OpenIDOptions    OpenIDOptions `bson:"openid_options" json:"openid_options"`
-	Oauth2Meta       struct {
+	Id                  bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
+	Name                string        `bson:"name" json:"name"`
+	Slug                string        `bson:"slug" json:"slug"`
+	ListenPort          int           `bson:"listen_port" json:"listen_port"`
+	Protocol            string        `bson:"protocol" json:"protocol"`
+	EnableProxyProtocol bool          `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	APIID               string        `bson:"api_id" json:"api_id"`
+	OrgID               string        `bson:"org_id" json:"org_id"`
+	UseKeylessAccess    bool          `bson:"use_keyless" json:"use_keyless"`
+	UseOauth2           bool          `bson:"use_oauth2" json:"use_oauth2"`
+	UseOpenID           bool          `bson:"use_openid" json:"use_openid"`
+	OpenIDOptions       OpenIDOptions `bson:"openid_options" json:"openid_options"`
+	Oauth2Meta          struct {
 		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
@@ -356,6 +380,7 @@ type APIDefinition struct {
 	PinnedPublicKeys           map[string]string    `bson:"pinned_public_keys" json:"pinned_public_keys"`
 	EnableJWT                  bool                 `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth            bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
+	UseGoPluginAuth            bool                 `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`
 	EnableCoProcessAuth        bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
 	JWTSigningMethod           string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
 	JWTSource                  string               `bson:"jwt_source" json:"jwt_source"`
@@ -367,10 +392,13 @@ type APIDefinition struct {
 	JWTExpiresAtValidationSkew uint64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
 	JWTNotBeforeValidationSkew uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
 	JWTSkipKid                 bool                 `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
+	JWTScopeToPolicyMapping    map[string]string    `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"`
+	JWTScopeClaimName          string               `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`
 	NotificationsDetails       NotificationsManager `bson:"notifications" json:"notifications"`
 	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
 	HmacAllowedAlgorithms      []string             `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
+	RequestSigning             RequestSigningMeta   `bson:"request_signing" json:"request_signing"`
 	BaseIdentityProvidedBy     AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
 	VersionDefinition          struct {
 		Location  string `bson:"location" json:"location"`
@@ -481,6 +509,13 @@ type BundleManifest struct {
 	Signature        string            `bson:"signature" json:"signature"`
 }
 
+type RequestSigningMeta struct {
+	IsEnabled bool   `bson:"is_enabled" json:"is_enabled"`
+	Secret    string `bson:"secret" json:"secret"`
+	KeyId     string `bson:"key_id" json:"key_id"`
+	Algorithm string `bson:"algorithm" json:"algorithm"`
+}
+
 // Clean will URL encode map[string]struct variables for saving
 func (a *APIDefinition) EncodeForDB() {
 	newVersion := make(map[string]VersionInfo)
@@ -567,25 +602,48 @@ func (a *APIDefinition) DecodeFromDB() {
 	}
 }
 
-func (s *StringRegexMap) Check(value string) string {
+func (s *StringRegexMap) Check(value string) (match string) {
+	if s.matchRegex == nil {
+		return
+	}
+
 	return s.matchRegex.FindString(value)
 }
 
-func (s *StringRegexMap) FindStringSubmatch(value string) []string {
-	return s.matchRegex.FindStringSubmatch(value)
+func (s *StringRegexMap) FindStringSubmatch(value string) (matched bool, match []string) {
+	if s.matchRegex == nil {
+		return
+	}
+
+	match = s.matchRegex.FindStringSubmatch(value)
+	if !s.Reverse {
+		matched = len(match) > 0
+	} else {
+		matched = len(match) == 0
+	}
+
+	return
 }
 
-func (s *StringRegexMap) FindAllStringSubmatch(value string, n int) [][]string {
-	return s.matchRegex.FindAllStringSubmatch(value, n)
+func (s *StringRegexMap) FindAllStringSubmatch(value string, n int) (matched bool, matches [][]string) {
+	matches = s.matchRegex.FindAllStringSubmatch(value, n)
+	if !s.Reverse {
+		matched = len(matches) > 0
+	} else {
+		matched = len(matches) == 0
+	}
+
+	return
 }
 
 func (s *StringRegexMap) Init() error {
 	var err error
 	if s.matchRegex, err = regexp.Compile(s.MatchPattern); err != nil {
 		log.WithError(err).WithField("MatchPattern", s.MatchPattern).
-			Error("Could not compile regexp for StringRegexMap")
+			Error("Could not compile matchRegex for StringRegexMap")
 		return err
 	}
+
 	return nil
 }
 
@@ -696,16 +754,17 @@ func DummyAPI() APIDefinition {
 	}
 
 	return APIDefinition{
-		VersionData:           versionData,
-		ConfigData:            map[string]interface{}{},
-		AllowedIPs:            []string{},
-		PinnedPublicKeys:      map[string]string{},
-		ResponseProcessors:    []ResponseProcessor{},
-		ClientCertificates:    []string{},
-		BlacklistedIPs:        []string{},
-		TagHeaders:            []string{},
-		UpstreamCertificates:  map[string]string{},
-		HmacAllowedAlgorithms: []string{},
+		VersionData:             versionData,
+		ConfigData:              map[string]interface{}{},
+		AllowedIPs:              []string{},
+		PinnedPublicKeys:        map[string]string{},
+		ResponseProcessors:      []ResponseProcessor{},
+		ClientCertificates:      []string{},
+		BlacklistedIPs:          []string{},
+		TagHeaders:              []string{},
+		UpstreamCertificates:    map[string]string{},
+		JWTScopeToPolicyMapping: map[string]string{},
+		HmacAllowedAlgorithms:   []string{},
 		CustomMiddleware: MiddlewareSection{
 			Post:        []MiddlewareDefinition{},
 			Pre:         []MiddlewareDefinition{},

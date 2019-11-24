@@ -1,5 +1,7 @@
 # Logrus Prefixed Log Formatter
-[Logrus](https://github.com/Sirupsen/logrus) formatter mainly based on original `logrus.TextFormatter` but with slightly
+[![Build Status](https://travis-ci.org/x-cray/logrus-prefixed-formatter.svg?branch=master)](https://travis-ci.org/x-cray/logrus-prefixed-formatter)
+
+[Logrus](https://github.com/sirupsen/logrus) formatter mainly based on original `logrus.TextFormatter` but with slightly
 modified colored output and support for log entry prefixes, e.g. message source followed by a colon. In addition, custom
 color themes are supported.
 
@@ -32,7 +34,7 @@ Here is how it should be used:
 package main
 
 import (
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
@@ -64,6 +66,7 @@ func main() {
 
 * `ForceColors bool` — set to true to bypass checking for a TTY before outputting colors.
 * `DisableColors bool` — force disabling colors. For a TTY colors are enabled by default.
+* `DisableUppercase bool` — set to true to turn off the conversion of the log level names to uppercase.
 * `ForceFormatting bool` — force formatted layout, even for non-TTY output.
 * `DisableTimestamp bool` — disable timestamp logging. Useful when output is redirected to logging system that already adds timestamps.
 * `FullTimestamp bool` — enable logging the full timestamp when a TTY is attached instead of just the time passed since beginning of execution.
@@ -90,14 +93,23 @@ Sets an alternative color scheme for colored output. `prefixed.ColorScheme` stru
 Color styles should be specified using [mgutz/ansi](https://github.com/mgutz/ansi#style-format) style syntax. For example, here is the default theme:
 
 ```go
-InfoLevelStyle: "green",
-WarnLevelStyle: "yellow",
+InfoLevelStyle:  "green",
+WarnLevelStyle:  "yellow",
 ErrorLevelStyle: "red",
 FatalLevelStyle: "red",
 PanicLevelStyle: "red",
 DebugLevelStyle: "blue",
-PrefixStyle: "cyan",
-TimestampStyle: "black+h"
+PrefixStyle:     "cyan",
+TimestampStyle:  "black+h"
+```
+
+It's not necessary to specify all colors when changing color scheme if you want to change just specific ones:
+
+```go
+formatter.SetColorScheme(&prefixed.ColorScheme{
+    PrefixStyle:    "blue+b",
+    TimestampStyle: "white+h",
+})
 ```
 
 # License
