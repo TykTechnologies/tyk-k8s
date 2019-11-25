@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/TykTechnologies/tyk-k8s/_test_util"
 	"github.com/TykTechnologies/tyk-k8s/ca"
 	"github.com/TykTechnologies/tyk-k8s/tyk"
-	"github.com/TykTechnologies/tykctl/api/_test_util"
 	"github.com/ghodss/yaml"
 )
 

@@ -21,11 +21,9 @@ import (
 //	'path' is dot-notation list of keys to traverse; last key in path can be newVal key
 //	       NOTE: 'path' spec does not currently support indexed array references.
 //	'subkeys' are "key:value[:type]" entries that must match for path node
-//             - For attributes prefix the label with the attribute prefix character, by default a 
-//               hyphen, '-', e.g., "-seq:3". (See SetAttrPrefix function.)
-//             - The subkey can be wildcarded - "key:*" - to require that it's there with some value.
-//             - If a subkey is preceeded with the '!' character, the key:value[:type] entry is treated as an
-//	              exclusion critera - e.g., "!author:William T. Gaddis".
+//	            The subkey can be wildcarded - "key:*" - to require that it's there with some value.
+//	            If a subkey is preceeded with the '!' character, the key:value[:type] entry is treated as an
+//	            exclusion critera - e.g., "!author:William T. Gaddis".
 //
 //	NOTES:
 //		1. Simple elements with attributes need a path terminated as ".#text" to modify the actual value.

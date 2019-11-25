@@ -135,9 +135,13 @@ type RequestOptions struct {
 	// before the request has been fired. This is useful for adding authentication
 	// and other functionality not provided in this library
 	BeforeRequest func(req *http.Request) error
+
+	// LocalAddr allows you to send the request on any local interface
+	LocalAddr *net.TCPAddr
 }
 
-func doRegularRequest(requestVerb, url string, ro *RequestOptions) (*Response, error) {
+// DoRegularRequest adds generic test functionality
+func DoRegularRequest(requestVerb, url string, ro *RequestOptions) (*Response, error) {
 	return buildResponse(buildRequest(requestVerb, url, ro, nil))
 }
 
@@ -427,6 +431,8 @@ func (ro RequestOptions) proxySettings(req *http.Request) (*url.URL, error) {
 // 5. Do we want to change the default request timeout?
 // 6. Do we want to change the default connection timeout?
 // 7. Do you want to use the http.Client's cookieJar?
+// 8. Do you want to change the request timeout?
+// 9. Do you want to set a custom LocalAddr to send the request from
 func (ro RequestOptions) dontUseDefaultClient() bool {
 	switch {
 	case ro.InsecureSkipVerify == true:
@@ -438,6 +444,7 @@ func (ro RequestOptions) dontUseDefaultClient() bool {
 	case len(ro.Cookies) != 0:
 	case ro.UseCookieJar != false:
 	case ro.RequestTimeout != 0:
+	case ro.LocalAddr != nil:
 	default:
 		return false
 	}
@@ -501,6 +508,7 @@ func createHTTPTransport(ro RequestOptions) *http.Transport {
 		Dial: (&net.Dialer{
 			Timeout:   ro.DialTimeout,
 			KeepAlive: ro.DialKeepAlive,
+			LocalAddr: ro.LocalAddr,
 		}).Dial,
 		TLSHandshakeTimeout: ro.TLSHandshakeTimeout,
 

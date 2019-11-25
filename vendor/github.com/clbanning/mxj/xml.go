@@ -1,4 +1,4 @@
-// Copyright 2012-2016, 2018-2019 Charles Banning. All rights reserved.
+// Copyright 2012-2016 Charles Banning. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file
 
@@ -258,21 +258,6 @@ func CoerceKeysToSnakeCase(b ...bool) {
 	}
 }
 
-// 10jan19: use of pull request #57 should be conditional - legacy code assumes
-// numeric values are float64.
-var castToInt bool
-
-// CastValuesToInt tries to coerce numeric valus to int64 or uint64 instead of the
-// default float64. Repeated calls with no argument will toggle this on/off, or this
-// handling will be set with the value of 'b'.
-func CastValuesToInt(b ...bool) {
-	if len(b) == 0 {
-		castToInt = !castToInt
-	} else if len(b) == 1 {
-		castToInt = b[0]
-	}
-}
-
 // 05feb17: support processing XMPP streams (issue #36)
 var handleXMPPStreamTag bool
 
@@ -344,7 +329,7 @@ func xmlToMapParser(skey string, a []xml.Attr, p *xml.Decoder, r bool) (map[stri
 				if lowerCase {
 					key = strings.ToLower(key)
 				}
-				na[key] = cast(v.Value, r, key)
+				na[key] = cast(v.Value, r)
 			}
 		}
 	}
@@ -452,9 +437,9 @@ func xmlToMapParser(skey string, a []xml.Attr, p *xml.Decoder, r bool) (map[stri
 			tt := strings.Trim(string(t.(xml.CharData)), "\t\r\b\n ")
 			if len(tt) > 0 {
 				if len(na) > 0 || decodeSimpleValuesAsMap {
-					na["#text"] = cast(tt, r, "#text")
+					na["#text"] = cast(tt, r)
 				} else if skey != "" {
-					n[skey] = cast(tt, r, skey)
+					n[skey] = cast(tt, r)
 				} else {
 					// per Adrian (http://www.adrianlungu.com/) catch stray text
 					// in decoder stream -
@@ -479,14 +464,7 @@ func CastNanInf(b bool) {
 }
 
 // cast - try to cast string values to bool or float64
-// 't' is the tag key that can be checked for 'not-casting'
-func cast(s string, r bool, t string) interface{} {
-	if checkTagToSkip != nil && t != "" && checkTagToSkip(t) {
-		// call the check-function here with 't[0]'
-		// if 'true' return s
-		return s
-	}
-
+func cast(s string, r bool) interface{} {
 	if r {
 		// handle nan and inf
 		if !castNanInf {
@@ -497,69 +475,22 @@ func cast(s string, r bool, t string) interface{} {
 		}
 
 		// handle numeric strings ahead of boolean
-		if castToInt {
-			if f, err := strconv.ParseInt(s, 10, 64); err == nil {
-				return f
-			}
-			if f, err := strconv.ParseUint(s, 10, 64); err == nil {
-				return f
-			}
+		if f, err := strconv.ParseFloat(s, 64); err == nil {
+			return f
 		}
-
-		if castToFloat {
-			if f, err := strconv.ParseFloat(s, 64); err == nil {
-				return f
-			}
-		}
-
 		// ParseBool treats "1"==true & "0"==false, we've already scanned those
 		// values as float64. See if value has 't' or 'f' as initial screen to
 		// minimize calls to ParseBool; also, see if len(s) < 6.
-		if castToBool {
-			if len(s) > 0 && len(s) < 6 {
-				switch s[:1] {
-				case "t", "T", "f", "F":
-					if b, err := strconv.ParseBool(s); err == nil {
-						return b
-					}
+		if len(s) > 0 && len(s) < 6 {
+			switch s[:1] {
+			case "t", "T", "f", "F":
+				if b, err := strconv.ParseBool(s); err == nil {
+					return b
 				}
 			}
 		}
 	}
 	return s
-}
-
-// pull request, #59
-var castToFloat = true
-
-// CastValuesToFloat can be used to skip casting to float64 when
-// "cast" argument is 'true' in NewMapXml, etc.
-// Default is true.
-func CastValuesToFloat(b bool) {
-	castToFloat = b
-}
-
-var castToBool = true
-
-// CastValuesToBool can be used to skip casting to bool when
-// "cast" argument is 'true' in NewMapXml, etc.
-// Default is true.
-func CastValuesToBool(b bool) {
-	castToBool = b
-}
-
-// checkTagToSkip - switch to address Issue #58
-
-var checkTagToSkip func(string) bool
-
-// SetCheckTagToSkipFunc registers function to test whether the value
-// for a tag should be cast to bool or float64 when "cast" argument is 'true'.
-// (Dot tag path notation is not supported.)
-// NOTE: key may be "#text" if it's a simple element with attributes
-//       or "decodeSimpleValuesAsMap == true".
-// NOTE: does not apply to NewMapXmlSeq... functions.
-func SetCheckTagToSkipFunc(fn func(string) bool) {
-	checkTagToSkip = fn
 }
 
 // ------------------ END: NewMapXml & NewMapXmlReader -------------------------
@@ -653,7 +584,6 @@ func (mv Map) XmlWriter(xmlWriter io.Writer, rootTag ...string) error {
 
 // Writes the Map as  XML on the Writer. []byte is the raw XML that was written.
 // See Xml() for encoding rules.
-/*
 func (mv Map) XmlWriterRaw(xmlWriter io.Writer, rootTag ...string) ([]byte, error) {
 	x, err := mv.Xml(rootTag...)
 	if err != nil {
@@ -663,7 +593,6 @@ func (mv Map) XmlWriterRaw(xmlWriter io.Writer, rootTag ...string) ([]byte, erro
 	_, err = xmlWriter.Write(x)
 	return x, err
 }
-*/
 
 // Writes the Map as pretty XML on the Writer.
 // See Xml() for encoding rules.
@@ -679,7 +608,6 @@ func (mv Map) XmlIndentWriter(xmlWriter io.Writer, prefix, indent string, rootTa
 
 // Writes the Map as pretty XML on the Writer. []byte is the raw XML that was written.
 // See Xml() for encoding rules.
-/*
 func (mv Map) XmlIndentWriterRaw(xmlWriter io.Writer, prefix, indent string, rootTag ...string) ([]byte, error) {
 	x, err := mv.XmlIndent(prefix, indent, rootTag...)
 	if err != nil {
@@ -689,7 +617,6 @@ func (mv Map) XmlIndentWriterRaw(xmlWriter io.Writer, prefix, indent string, roo
 	_, err = xmlWriter.Write(x)
 	return x, err
 }
-*/
 
 // -------------------- END: mv.Xml & mv.XmlWriter -------------------------------
 

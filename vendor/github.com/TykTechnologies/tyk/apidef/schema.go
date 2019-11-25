@@ -48,9 +48,12 @@ const Schema = `{
         "openid_options": {
             "type": ["object", "null"]
         },
-        "use_standard_auth":{
+        "use_standard_auth": {
             "type": "boolean"
         },
+		"use_go_plugin_auth": {
+			"type": "boolean"
+		},
         "enable_coprocess_auth": {
             "type": "boolean"
         },
@@ -276,6 +279,15 @@ const Schema = `{
         "domain": {
             "type": "string"
         },
+        "listen_port": {
+            "type": "number"
+        },
+        "protocol": {
+            "type": "string"
+        },
+        "enable_proxy_protocol": {
+            "type": "boolean"
+        },
         "certificates": {
             "type": ["array", "null"]
         },
@@ -391,6 +403,26 @@ const Schema = `{
                     "type": "number"
                 }
             }
+        },
+	"request_signing": {
+          "type": ["object", "null"],
+           "properties": {
+                "is_enabled": {
+                    "type": "boolean"
+                },
+                "secret": {
+                    "type": "string"
+                },
+		"key_id": {
+                    "type": "string"
+                },
+		"algorithm": {
+                    "type": "string"
+                }
+            },
+	    "required": [
+	    	"is_enabled"
+	    ]
         }
     },
     "required": [
