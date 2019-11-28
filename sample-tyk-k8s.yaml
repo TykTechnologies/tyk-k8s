@@ -12,6 +12,11 @@ Tyk:
   secret: "set-by-env"
   org: "set-by-env"
 
+Ingress:
+  watchNamespaces:
+    - default
+    - myapp
+
 # If last-mile TLS is enabled, this section defines the Certificate Authority
 # behaviour, you can use the documentation for CFSSL to better understand what
 # the options here do as they are a direct map.

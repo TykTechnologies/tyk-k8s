@@ -91,7 +91,6 @@ func New(cfg *Config) (*Client, error) {
 		CA: cfg,
 	}
 
-	log.Info(cfg)
 	if cfg.CertPath == "" {
 		return nil, fmt.Errorf("root CA certificate is required for bundling")
 	}

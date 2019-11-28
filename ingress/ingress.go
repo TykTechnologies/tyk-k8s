@@ -16,37 +16,69 @@ import (
 	"github.com/TykTechnologies/tyk-k8s/tyk"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
-	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
+	netv1beta1 "k8s.io/api/networking/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-type Config struct{}
+type Config struct {
+	WatchNamespaces []string
+}
 
 var ctrl *ControlServer
 var log = logger.GetLogger("ingress")
 var opLog = sync.Map{}
+var runtimeScheme = runtime.NewScheme()
 
 const (
 	IngressAnnotation      = "kubernetes.io/ingress.class"
 	IngressAnnotationValue = "tyk"
+	defaultResync          = 2 * time.Minute
 )
 
 type ControlServer struct {
-	cfg               *Config
-	client            *kubernetes.Clientset
-	store             cache.Store
-	ingressController cache.Controller
-	podController     cache.Controller
-	stopCh            chan struct{}
+	cfg                 *Config
+	client              *kubernetes.Clientset
+	stopCh              chan struct{}
+	factories           map[string]informers.SharedInformerFactory
+	isNetworkingIngress bool
+}
+
+func init() {
+	v1beta1.AddToScheme(runtimeScheme)
+	netv1beta1.AddToScheme(runtimeScheme)
+}
+
+func convertIngress(obj interface{}) (*netv1beta1.Ingress, bool) {
+	extIngress, ok := obj.(*v1beta1.Ingress)
+	if ok {
+		netIngress := &netv1beta1.Ingress{}
+		if err := runtimeScheme.Convert(extIngress, netIngress, nil); err != nil {
+			log.Errorf("error converting ingress from extensions/v1beta1: %v", err)
+			return nil, false
+		}
+
+		return netIngress, true
+	}
+
+	if ing, ok := obj.(*netv1beta1.Ingress); ok {
+		return ing, true
+	}
+
+	return nil, false
 }
 
 func NewController() *ControlServer {
 	if ctrl == nil {
-		ctrl = &ControlServer{}
+		ctrl = &ControlServer{
+			factories: make(map[string]informers.SharedInformerFactory),
+		}
 	}
 
 	return ctrl
@@ -58,6 +90,11 @@ func Controller() *ControlServer {
 	}
 
 	return ctrl
+}
+
+func (c *ControlServer) Config(cfg *Config) *ControlServer {
+	c.cfg = cfg
+	return c
 }
 
 func (c *ControlServer) getClient() (*kubernetes.Clientset, error) {
@@ -85,10 +122,9 @@ func (c *ControlServer) Start() error {
 	if err != nil {
 		return err
 	}
+	c.setNetworkingIngress()
 
-	c.watchIngresses()
-	c.watchPods()
-	return nil
+	return c.watchAll()
 }
 
 func (c *ControlServer) Stop() error {
@@ -110,7 +146,7 @@ func (c *ControlServer) getAPIName(name, service string) string {
 	return v
 }
 
-func (c *ControlServer) generateIngressID(ingressName, ns string, p v1beta1.HTTPIngressPath) string {
+func (c *ControlServer) generateIngressID(ingressName, ns string, p netv1beta1.HTTPIngressPath) string {
 	serviceFQDN := fmt.Sprintf("%s.%s.%s/%s", ingressName, ns, p.Backend.ServiceName, p.Path)
 	hasher := sha1.New()
 	hasher.Write([]byte(serviceFQDN))
@@ -119,12 +155,12 @@ func (c *ControlServer) generateIngressID(ingressName, ns string, p v1beta1.HTTP
 	return sha
 }
 
-func (c *ControlServer) handleTLS(ing *v1beta1.Ingress) (map[string]string, error) {
+func (c *ControlServer) handleTLS(ing *netv1beta1.Ingress) (map[string]string, error) {
 	log.Info("checking for TLS entries")
 	certMap := map[string]string{}
 	for _, iTLS := range ing.Spec.TLS {
 		log.Info("found TLS entry: ", iTLS.String())
-		sec, err := c.client.CoreV1().Secrets(ing.Namespace).Get(iTLS.SecretName, v12.GetOptions{})
+		sec, err := c.client.CoreV1().Secrets(ing.Namespace).Get(iTLS.SecretName, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +192,7 @@ func (c *ControlServer) handleTLS(ing *v1beta1.Ingress) (map[string]string, erro
 
 }
 
-func checkAndGetTemplate(ing *v1beta1.Ingress) string {
+func checkAndGetTemplate(ing *netv1beta1.Ingress) string {
 	for k, v := range ing.Annotations {
 		if k == tyk.TemplateNameKey {
 			log.Infof("template annotation found with value: %v", v)
@@ -167,7 +203,7 @@ func checkAndGetTemplate(ing *v1beta1.Ingress) string {
 	return tyk.DefaultIngressTemplate
 }
 
-func (c *ControlServer) doAdd(ing *v1beta1.Ingress) error {
+func (c *ControlServer) doAdd(ing *netv1beta1.Ingress) error {
 	tags := []string{"ingress"}
 	hName := ""
 
@@ -227,7 +263,7 @@ func (c *ControlServer) doAdd(ing *v1beta1.Ingress) error {
 }
 
 func (c *ControlServer) handleIngressAdd(obj interface{}) {
-	ing, ok := obj.(*v1beta1.Ingress)
+	ing, ok := convertIngress(obj)
 	if !ok {
 		log.Errorf("type not allowed: %v", reflect.TypeOf(obj))
 		return
@@ -244,7 +280,7 @@ func (c *ControlServer) handleIngressAdd(obj interface{}) {
 }
 
 func (c *ControlServer) handleIngressUpdate(oldObj interface{}, newObj interface{}) {
-	oldIng, ok := oldObj.(*v1beta1.Ingress)
+	oldIng, ok := convertIngress(oldObj)
 	if !ok {
 		log.Errorf("type not allowed: %v", reflect.TypeOf(oldIng))
 		return
@@ -254,7 +290,7 @@ func (c *ControlServer) handleIngressUpdate(oldObj interface{}, newObj interface
 		return
 	}
 
-	newIng, ok := newObj.(*v1beta1.Ingress)
+	newIng, ok := convertIngress(newObj)
 	if !ok {
 		log.Errorf("type not allowed: %v", reflect.TypeOf(newIng))
 		return
@@ -300,7 +336,7 @@ func (c *ControlServer) handleIngressUpdate(oldObj interface{}, newObj interface
 
 }
 
-func (c *ControlServer) ingressChanged(old *v1beta1.Ingress, new *v1beta1.Ingress) bool {
+func (c *ControlServer) ingressChanged(old *netv1beta1.Ingress, new *netv1beta1.Ingress) bool {
 	if len(new.Spec.Rules) > 0 {
 		r0 := new.Spec.Rules[0]
 		hName := r0.Host
@@ -322,7 +358,7 @@ func (c *ControlServer) ingressChanged(old *v1beta1.Ingress, new *v1beta1.Ingres
 
 }
 
-func (c *ControlServer) doDelete(oldIng *v1beta1.Ingress) error {
+func (c *ControlServer) doDelete(oldIng *netv1beta1.Ingress) error {
 	for _, r0 := range oldIng.Spec.Rules {
 		for _, p := range r0.HTTP.Paths {
 			sid := c.generateIngressID(oldIng.Name, oldIng.Namespace, p)
@@ -339,7 +375,7 @@ func (c *ControlServer) doDelete(oldIng *v1beta1.Ingress) error {
 }
 
 func (c *ControlServer) handleIngressDelete(obj interface{}) {
-	ing, ok := obj.(*v1beta1.Ingress)
+	ing, ok := convertIngress(obj)
 	if !ok {
 		log.Errorf("type not allowed: %v", reflect.TypeOf(obj))
 		return
@@ -355,7 +391,7 @@ func (c *ControlServer) handleIngressDelete(obj interface{}) {
 	}
 }
 
-func (c *ControlServer) checkIngressManaged(ing *v1beta1.Ingress) bool {
+func (c *ControlServer) checkIngressManaged(ing *netv1beta1.Ingress) bool {
 	for k, v := range ing.Annotations {
 		if k == IngressAnnotation {
 			if strings.ToLower(v) == IngressAnnotationValue {
@@ -367,46 +403,78 @@ func (c *ControlServer) checkIngressManaged(ing *v1beta1.Ingress) bool {
 	return false
 }
 
-func (c *ControlServer) watchIngresses() {
-	log.Info("Watching for ingress activity")
-	watchList := cache.NewListWatchFromClient(c.client.ExtensionsV1beta1().RESTClient(), "ingresses", v1.NamespaceAll,
-		fields.Everything())
-	c.store, c.ingressController = cache.NewInformer(
-		watchList,
-		&v1beta1.Ingress{},
-		time.Second*10,
-		cache.ResourceEventHandlerFuncs{
+// Checks whether k8s version is 1.14+ and therefore uses networking API for ingresses
+func (c *ControlServer) setNetworkingIngress() {
+	version114, err := version.ParseGeneric("v1.14.0")
+	if err != nil {
+		log.Errorf("error parsing version: %v", err)
+		return
+	}
+
+	discoveredVersion, err := c.client.Discovery().ServerVersion()
+	if err != nil {
+		log.Errorf("error discovering k8s version: %v", err)
+		return
+	}
+
+	k8sVersion, err := version.ParseGeneric(discoveredVersion.String())
+	if err != nil {
+		log.Errorf("error parsing discovered k8s version: %v", err)
+		return
+	}
+
+	c.isNetworkingIngress = k8sVersion.AtLeast(version114)
+}
+
+// Watches k8s resources required for ingress controller operations using shared informers
+func (c *ControlServer) watchAll() error {
+	namespaces := c.cfg.WatchNamespaces
+	if len(namespaces) == 0 {
+		namespaces = []string{v1.NamespaceAll}
+	}
+
+	for _, ns := range namespaces {
+		log.Infof("Registering informers for namespace %s", ns)
+		factory := informers.NewSharedInformerFactoryWithOptions(c.client, defaultResync, informers.WithNamespace(ns))
+
+		// Watch ingresses
+		var ingressesInformer cache.SharedIndexInformer
+		if c.isNetworkingIngress {
+			ingressesInformer = factory.Networking().V1beta1().Ingresses().Informer()
+		} else {
+			ingressesInformer = factory.Extensions().V1beta1().Ingresses().Informer()
+			log.Info("Using deprecated extensions/v1beta1 ingresses API")
+		}
+		ingressesInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.handleIngressAdd,
 			UpdateFunc: c.handleIngressUpdate,
 			DeleteFunc: c.handleIngressDelete,
-		},
-	)
+		})
 
-	c.stopCh = make(chan struct{})
-	go c.ingressController.Run(c.stopCh)
-}
-
-func (c *ControlServer) watchPods() {
-	log.Info("Watching for pod deletion")
-	watchList := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "pods", v1.NamespaceAll,
-		fields.Everything())
-	c.store, c.podController = cache.NewInformer(
-		watchList,
-		&v1.Pod{},
-		time.Second*10,
-		cache.ResourceEventHandlerFuncs{
+		// Watch pods
+		factory.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    nil,
+			UpdateFunc: nil,
 			DeleteFunc: c.handlePodDelete,
-		},
-	)
+		})
 
-	c.stopCh = make(chan struct{})
-	go c.podController.Run(c.stopCh)
+		c.factories[ns] = factory
+		factory.Start(c.stopCh)
+
+		for t, ok := range factory.WaitForCacheSync(c.stopCh) {
+			if !ok {
+				return fmt.Errorf("failed while syncing %s caches for ns %s", t.String(), ns)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (c *ControlServer) handlePodDeleteForMesh(pd *v1.Pod) {
 	log.Info("pod is injector-managed")
 
-	remPds, err := c.client.CoreV1().Pods(pd.Namespace).List(v12.ListOptions{})
+	remPds, err := c.client.CoreV1().Pods(pd.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		log.Error(err)
 	}
