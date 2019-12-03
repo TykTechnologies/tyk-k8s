@@ -7,7 +7,7 @@ import (
 	"github.com/TykTechnologies/tyk-sync/clients/objects"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
-	"k8s.io/api/extensions/v1beta1"
+	"k8s.io/api/networking/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"net/http"
@@ -59,7 +59,7 @@ func TestControlServer_getAPIName(t *testing.T) {
 
 func TestControlServer_noPaths(t *testing.T) {
 	example := `
-apiVersion: extensions/v1beta1
+apiVersion: networking/v1beta1
 kind: Ingress
 metadata:
   name: cafe-ingress
