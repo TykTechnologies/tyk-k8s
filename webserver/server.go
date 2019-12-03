@@ -49,10 +49,10 @@ func (s *WebServer) AddRoute(method string, route string, handler func(http.Resp
 func (s *WebServer) Config(cfg *Config) {
 	if cfg == nil {
 		log.Info("using default config on port 9797")
-		s.cfg = &Config{
-			Addr: ":9797",
-		}
-		return
+		cfg = &Config{}
+	}
+	if cfg.Addr == "" {
+		cfg.Addr = ":9797"
 	}
 
 	s.cfg = cfg

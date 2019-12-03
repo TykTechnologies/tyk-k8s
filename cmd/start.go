@@ -48,6 +48,13 @@ var startCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
+		// Ingress controller configuration
+		ingConf := &ingress.Config{}
+		if err := viper.UnmarshalKey("Ingress", ingConf); err != nil {
+			log.Fatalf("couldn't read Ingress config: %v", err)
+		}
+		controller := ingress.Controller().Config(ingConf)
+
 		whs := &injector.WebhookServer{
 			SidecarConfig: whConf,
 			CAConfig:      caConf,
@@ -65,9 +72,7 @@ var startCmd = &cobra.Command{
 		webserver.Server().AddRoute("POST", "/inject", whs.Serve)
 
 		// Ingress controller
-		ingress.NewController()
-		err = ingress.Controller().Start()
-		if err != nil {
+		if err := controller.Start(); err != nil {
 			log.Fatal(err)
 		}
 		log.Info("ingress controller started")
@@ -82,11 +87,9 @@ var startCmd = &cobra.Command{
 			log.Error(err)
 		}
 
-		err = ingress.Controller().Stop()
-		if err != nil {
+		if err := controller.Stop(); err != nil {
 			log.Error(err)
 		}
-
 	},
 }
 
