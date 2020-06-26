@@ -3,15 +3,16 @@ package ingress
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"testing"
+
 	"github.com/TykTechnologies/tyk-k8s/tyk"
 	"github.com/TykTechnologies/tyk-sync/clients/objects"
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
 	"k8s.io/api/networking/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"net/http"
-	"testing"
 )
 
 var lastResponse = ""
@@ -222,4 +223,260 @@ func TestControlServer_doAddWithCustomTemplate(t *testing.T) {
 	}
 
 	lastResponse = ""
+}
+
+var ingTests = []struct {
+	name string
+	in   *v1beta1.Ingress
+	out  *v1beta1.Ingress
+}{
+	{"changed host", &v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation: IngressAnnotationValue,
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "foo.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "foo-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}, &v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation: IngressAnnotationValue,
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "bar.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "foo-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+	},
+	{"changed path", &v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation: IngressAnnotationValue,
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "foo.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "foo-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}, &v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation: IngressAnnotationValue,
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "foo.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/changed",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "foo-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+	},
+	// changed service name
+	{"changed service name", &v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation: IngressAnnotationValue,
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "foo.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "foo-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}, &v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation: IngressAnnotationValue,
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "foo.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "bar-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+	},
+	//changed service port
+	{"changed service port", &v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation: IngressAnnotationValue,
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "foo.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "foo-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}, &v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation: IngressAnnotationValue,
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "foo.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "foo-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "8000"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+	},
+}
+
+func TestIngressChanged(t *testing.T) {
+
+	x := NewController()
+
+	for _, tt := range ingTests {
+		t.Run(tt.name, func(t *testing.T) {
+			changed := x.ingressChanged(tt.in, tt.out)
+			if !changed {
+				t.Errorf("Wanted change but none detected for: %s", tt.name)
+			}
+		})
+	}
+
 }
