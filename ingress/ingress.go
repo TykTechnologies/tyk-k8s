@@ -351,7 +351,19 @@ func (c *ControlServer) ingressChanged(old *netv1beta1.Ingress, new *netv1beta1.
 			return true
 		}
 
-		// TODO: Handle if a path is changed
+		// Handle if a path is changed
+		for i := 0; i < len(old.Spec.Rules[0].HTTP.Paths); i++ {
+
+			if old.Spec.Rules[0].HTTP.Paths[i] != r0.HTTP.Paths[i] {
+				return true
+			}
+			// check for changed service names and ports
+			if old.Spec.Rules[0].HTTP.Paths[i].Backend.ServiceName != r0.HTTP.Paths[i].Backend.ServiceName ||
+				old.Spec.Rules[0].HTTP.Paths[i].Backend.ServicePort != r0.HTTP.Paths[i].Backend.ServicePort {
+				return true
+			}
+		}
+
 	}
 
 	return false
