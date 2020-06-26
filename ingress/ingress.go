@@ -345,13 +345,13 @@ func (c *ControlServer) ingressChanged(old *netv1beta1.Ingress, new *netv1beta1.
 	}
 	// check regular string annotations
 	for k, v := range new.Annotations {
-		if old.Annotations[k] != v && k != tyk.TemplateNameKey {
+		if old.Annotations[k] != v && k != tyk.TemplateNameKey && strings.Contains(k, "service.tyk.io") {
 			return true
 		}
 	}
 
 	if len(new.Spec.Rules) > 0 {
-		for ruleNum := 0; ruleNum < len(new.Spec.Rules); ruleNum++ {
+		for ruleNum := range new.Spec.Rules {
 
 			newRule := new.Spec.Rules[ruleNum]
 			oldRule := old.Spec.Rules[ruleNum]
@@ -368,7 +368,7 @@ func (c *ControlServer) ingressChanged(old *netv1beta1.Ingress, new *netv1beta1.
 			}
 
 			// Handle if a path is changed
-			for pathNum := 0; pathNum < len(oldRule.HTTP.Paths); pathNum++ {
+			for pathNum := range oldRule.HTTP.Paths {
 
 				if oldRule.HTTP.Paths[pathNum] != newRule.HTTP.Paths[pathNum] {
 					return true
