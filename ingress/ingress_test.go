@@ -287,8 +287,7 @@ var ingTests = []struct {
 			},
 		},
 	},
-	},
-	{"changed path", &v1beta1.Ingress{
+	}, {"changed path", &v1beta1.Ingress{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo-name",
 			Namespace: "bar-namespace",
@@ -345,9 +344,7 @@ var ingTests = []struct {
 			},
 		},
 	},
-	},
-	// changed service name
-	{"changed service name", &v1beta1.Ingress{
+	}, {"changed service name", &v1beta1.Ingress{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo-name",
 			Namespace: "bar-namespace",
@@ -404,9 +401,7 @@ var ingTests = []struct {
 			},
 		},
 	},
-	},
-	//changed service port
-	{"changed service port", &v1beta1.Ingress{
+	}, {"changed service port", &v1beta1.Ingress{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo-name",
 			Namespace: "bar-namespace",
@@ -454,6 +449,65 @@ var ingTests = []struct {
 									Backend: v1beta1.IngressBackend{
 										ServiceName: "foo-service",
 										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "8000"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+	}, {"changed annotation", &v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation:                 IngressAnnotationValue,
+				"bool.service.tyk.io/use-keyless": "false",
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "foo.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "foo-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}, &v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation:                 IngressAnnotationValue,
+				"bool.service.tyk.io/use-keyless": "true",
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "foo.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "foo-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
 									},
 								},
 							},
