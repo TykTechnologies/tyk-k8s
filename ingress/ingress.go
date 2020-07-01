@@ -322,6 +322,7 @@ func (c *ControlServer) handleIngressUpdate(oldObj interface{}, newObj interface
 			opts.TemplateName = checkAndGetTemplate(newIng)
 			opts.Hostname = hName
 			opts.Tags = tags
+			opts.Annotations = newIng.Annotations
 
 			createOrUpdateList[opts.Slug] = opts
 		}
