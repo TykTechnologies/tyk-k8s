@@ -203,7 +203,6 @@ func TestControlServer_doAddWithCustomTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(lastResponse[0])
 	def := &objects.DBApiDefinition{}
 	err = json.Unmarshal([]byte(lastResponse), def)
 	if err != nil {
