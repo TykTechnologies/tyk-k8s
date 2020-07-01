@@ -28,8 +28,5 @@ WORKDIR /opt/tyk-k8s
 # Copy the Pre-built binary file from the previous stage
 COPY --from=builder /app/tyk-k8s /opt/tyk-k8s/tyk-k8s
 
-# Expose port 8080 to the outside world
-EXPOSE 8080
-
 # Command to run the executable
 CMD ["./tyk-k8s", "start"]
