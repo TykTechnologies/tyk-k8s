@@ -337,33 +337,49 @@ func (c *ControlServer) handleIngressUpdate(oldObj interface{}, newObj interface
 }
 
 func (c *ControlServer) ingressChanged(old *netv1beta1.Ingress, new *netv1beta1.Ingress) bool {
+
+	//first check top level changes like annotations
+	// try and get out early with a simple length check
+	if len(old.Annotations) != len(new.Annotations) {
+		return true
+	}
+	// check regular string annotations
+	for k, v := range new.Annotations {
+		if old.Annotations[k] != v && k != tyk.TemplateNameKey && strings.Contains(k, "service.tyk.io") {
+			return true
+		}
+	}
+
 	if len(new.Spec.Rules) > 0 {
-		r0 := new.Spec.Rules[0]
-		hName := r0.Host
+		for ruleNum := range new.Spec.Rules {
 
-		// If hostname changed, re-create
-		if hName != old.Spec.Rules[0].Host {
-			return true
-		}
+			newRule := new.Spec.Rules[ruleNum]
+			oldRule := old.Spec.Rules[ruleNum]
+			hName := newRule.Host
 
-		// New or deleted paths
-		if len(r0.HTTP.Paths) != len(old.Spec.Rules[0].HTTP.Paths) {
-			return true
-		}
-
-		// Handle if a path is changed
-		for i := 0; i < len(old.Spec.Rules[0].HTTP.Paths); i++ {
-
-			if old.Spec.Rules[0].HTTP.Paths[i] != r0.HTTP.Paths[i] {
+			// If hostname changed, re-create
+			if hName != old.Spec.Rules[0].Host {
 				return true
 			}
-			// check for changed service names and ports
-			if old.Spec.Rules[0].HTTP.Paths[i].Backend.ServiceName != r0.HTTP.Paths[i].Backend.ServiceName ||
-				old.Spec.Rules[0].HTTP.Paths[i].Backend.ServicePort != r0.HTTP.Paths[i].Backend.ServicePort {
+
+			// New or deleted paths
+			if len(newRule.HTTP.Paths) != len(oldRule.HTTP.Paths) {
 				return true
 			}
-		}
 
+			// Handle if a path is changed
+			for pathNum := range oldRule.HTTP.Paths {
+
+				if oldRule.HTTP.Paths[pathNum] != newRule.HTTP.Paths[pathNum] {
+					return true
+				}
+				// check for changed service names and ports
+				if oldRule.HTTP.Paths[ruleNum].Backend.ServiceName != newRule.HTTP.Paths[pathNum].Backend.ServiceName ||
+					oldRule.HTTP.Paths[pathNum].Backend.ServicePort != newRule.HTTP.Paths[pathNum].Backend.ServicePort {
+					return true
+				}
+			}
+		}
 	}
 
 	return false

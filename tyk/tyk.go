@@ -5,18 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/apidef"
 	"path"
 	"regexp"
 	"strings"
 	"text/template"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
+	"github.com/TykTechnologies/tyk-k8s/logger"
+	"github.com/TykTechnologies/tyk-k8s/processor"
 	"github.com/TykTechnologies/tyk-sync/clients/dashboard"
 	"github.com/TykTechnologies/tyk-sync/clients/gateway"
 	"github.com/TykTechnologies/tyk-sync/clients/interfaces"
 	"github.com/TykTechnologies/tyk-sync/clients/objects"
-	"github.com/TykTechnologies/tyk-k8s/logger"
-	"github.com/TykTechnologies/tyk-k8s/processor"
 	"github.com/satori/go.uuid"
 	"github.com/spf13/viper"
 )
@@ -291,6 +292,16 @@ func UpdateAPIs(svcs map[string]*APIDefOptions) error {
 		if err != nil {
 			errs = append(errs, err)
 			continue
+		}
+
+		postProcessedDef := string(adBytes)
+		log.Debug(postProcessedDef)
+		if opts.Annotations != nil {
+			postProcessedDef, err = processor.Process(opts.Annotations, string(adBytes))
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
 		}
 
 		apiDef := objects.NewDefinition()

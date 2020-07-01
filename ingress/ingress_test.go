@@ -7,15 +7,16 @@ import (
 	"net/http"
 	"testing"
 
+	yaml "gopkg.in/yaml.v2"
+
 	"github.com/TykTechnologies/tyk-k8s/tyk"
 	"github.com/TykTechnologies/tyk-sync/clients/objects"
-	"gopkg.in/yaml.v2"
 	"k8s.io/api/networking/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-var lastResponse = ""
+var lastResponse string
 var running = false
 
 func serverSetup() {
@@ -63,12 +64,12 @@ func TestControlServer_noPaths(t *testing.T) {
 apiVersion: networking/v1beta1
 kind: Ingress
 metadata:
-  name: cafe-ingress
-  annotations:
-    kubernetes.io/ingress.class: tyk
+ name: cafe-ingress
+ annotations:
+   kubernetes.io/ingress.class: tyk
 spec:
-  rules:
-    - host: cafe.example.com
+ rules:
+   - host: cafe.example.com
 `
 
 	go serverSetup()
@@ -177,7 +178,7 @@ func TestControlServer_doAddWithCustomTemplate(t *testing.T) {
 						HTTP: &v1beta1.HTTPIngressRuleValue{
 							Paths: []v1beta1.HTTPIngressPath{
 								{
-									Path: "/",
+									Path: "/foo",
 									Backend: v1beta1.IngressBackend{
 										ServiceName: "foo-service",
 										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
@@ -202,7 +203,6 @@ func TestControlServer_doAddWithCustomTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	def := &objects.DBApiDefinition{}
 	err = json.Unmarshal([]byte(lastResponse), def)
 	if err != nil {
@@ -225,12 +225,11 @@ func TestControlServer_doAddWithCustomTemplate(t *testing.T) {
 	lastResponse = ""
 }
 
-var ingTests = []struct {
-	name string
-	in   *v1beta1.Ingress
-	out  *v1beta1.Ingress
+var ingTests = map[string]struct {
+	in  *v1beta1.Ingress
+	out *v1beta1.Ingress
 }{
-	{"changed host", &v1beta1.Ingress{
+	"changed host": {&v1beta1.Ingress{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo-name",
 			Namespace: "bar-namespace",
@@ -287,8 +286,7 @@ var ingTests = []struct {
 			},
 		},
 	},
-	},
-	{"changed path", &v1beta1.Ingress{
+	}, "changed path": {&v1beta1.Ingress{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo-name",
 			Namespace: "bar-namespace",
@@ -345,9 +343,7 @@ var ingTests = []struct {
 			},
 		},
 	},
-	},
-	// changed service name
-	{"changed service name", &v1beta1.Ingress{
+	}, "changed service name": {&v1beta1.Ingress{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo-name",
 			Namespace: "bar-namespace",
@@ -404,9 +400,7 @@ var ingTests = []struct {
 			},
 		},
 	},
-	},
-	//changed service port
-	{"changed service port", &v1beta1.Ingress{
+	}, "changed service port": {&v1beta1.Ingress{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo-name",
 			Namespace: "bar-namespace",
@@ -463,18 +457,79 @@ var ingTests = []struct {
 			},
 		},
 	},
+	}, "changed annotation": {&v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation:                 IngressAnnotationValue,
+				"bool.service.tyk.io/use-keyless": "false",
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "foo.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "foo-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}, &v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation:                 IngressAnnotationValue,
+				"bool.service.tyk.io/use-keyless": "true",
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "foo.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "foo-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	},
 	},
 }
 
 func TestIngressChanged(t *testing.T) {
 
+	t.Parallel()
 	x := NewController()
 
-	for _, tt := range ingTests {
-		t.Run(tt.name, func(t *testing.T) {
-			changed := x.ingressChanged(tt.in, tt.out)
+	for name, tc := range ingTests {
+		name, tc := name, tc
+		t.Run(name, func(t *testing.T) {
+			changed := x.ingressChanged(tc.in, tc.out)
 			if !changed {
-				t.Errorf("Wanted change but none detected for: %s", tt.name)
+				t.Errorf("Wanted change but none detected for: %s", name)
 			}
 		})
 	}
