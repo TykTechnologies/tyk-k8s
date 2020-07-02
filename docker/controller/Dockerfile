@@ -1,5 +1,5 @@
 # Start from the latest golang base image
-FROM golang:latest as builder
+FROM golang:1.13 as builder
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -18,9 +18,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o tyk-k8s .
 
 
 ######## Start a new stage from scratch #######
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates
+FROM debian:buster-slim
 
 RUN mkdir -p /opt/tyk-k8s
 WORKDIR /opt/tyk-k8s
@@ -28,5 +26,6 @@ WORKDIR /opt/tyk-k8s
 # Copy the Pre-built binary file from the previous stage
 COPY --from=builder /app/tyk-k8s /opt/tyk-k8s/tyk-k8s
 
-# Command to run the executable
-CMD ["./tyk-k8s", "start"]
+ENTRYPOINT ["./tyk-k8s"]
+
+CMD ["start"]
