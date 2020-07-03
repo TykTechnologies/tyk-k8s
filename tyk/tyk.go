@@ -146,10 +146,12 @@ func TemplateService(opts *APIDefOptions) ([]byte, error) {
 
 	defTpl, err := getTemplate(opts.TemplateName)
 	if err != nil {
+		log.Error("Problem fetching template: %v", opts.TemplateName)
 		return nil, err
 	}
 	// In hybrid gateway we want slug to be a human readable path - not the Ingress ID
 	if cfg.IsHybrid {
+		log.Debug("Hybrid gateway. Slug set from listen path.")
 		opts.Slug = opts.ListenPath
 	} else {
 		opts.Slug = cleanSlug(opts.Slug)

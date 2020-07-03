@@ -158,6 +158,130 @@ func TestControlServer_doAdd(t *testing.T) {
 	lastResponse = ""
 }
 
+func TestControlServer_UpdateAPIs(t *testing.T) {
+	go serverSetup()
+	x := NewController()
+	ing := &v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation: IngressAnnotationValue,
+				"bool.service.tyk.io/proxy.preserve_host_header": "true",
+				"string.service.tyk.io/proxy.target_url":         "http://httpbin.org",
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "foo.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "foo-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tykConf := &tyk.TykConf{}
+	tykConf.URL = "http://localhost:9696"
+	tykConf.Secret = "foo"
+
+	tyk.Init(tykConf)
+
+	err := x.doAdd(ing)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	def := &objects.DBApiDefinition{}
+	err = json.Unmarshal([]byte(lastResponse), def)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	exp := "http://httpbin.org"
+	if def.Proxy.TargetURL != exp {
+		t.Fatal("target url should be ", exp, ", got: ", def.Proxy.ListenPath)
+	}
+
+	if !def.Proxy.PreserveHostHeader {
+		t.Fatal("Api def field not set correctly from annotation")
+	}
+
+	lastResponse = ""
+
+	ingToUpdate := &v1beta1.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo-name",
+			Namespace: "bar-namespace",
+			Annotations: map[string]string{
+				IngressAnnotation: IngressAnnotationValue,
+				"bool.service.tyk.io/proxy.preserve_host_header": "true",
+				"bool.service.tyk.io/use_standard_auth":          "true",
+				"string.service.tyk.io/proxy.target_url":         "http://httpbin.org/ip",
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: "foo.com",
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: "foo-service",
+										ServicePort: intstr.IntOrString{IntVal: 80, StrVal: "80"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	x.handleIngressUpdate(ing, ingToUpdate)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defUpdated := &objects.DBApiDefinition{}
+	err = json.Unmarshal([]byte(lastResponse), defUpdated)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	exp = "http://httpbin.org/ip"
+	if defUpdated.Proxy.TargetURL != exp {
+		t.Fatal("target url should be ", exp, ", got: ", def.Proxy.ListenPath)
+	}
+
+	if !defUpdated.Proxy.PreserveHostHeader {
+		t.Fatal("Api def field not set correctly from annotation")
+	}
+
+	if !defUpdated.UseStandardAuth {
+		t.Fatal("Api def auth field not set correctly from annotation")
+	}
+
+	lastResponse = ""
+
+}
+
 func TestControlServer_doAddWithCustomTemplate(t *testing.T) {
 	go serverSetup()
 	x := NewController()
@@ -533,5 +657,4 @@ func TestIngressChanged(t *testing.T) {
 			}
 		})
 	}
-
 }
