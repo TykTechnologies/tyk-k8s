@@ -280,6 +280,7 @@ func (c *ControlServer) handleIngressAdd(obj interface{}) {
 }
 
 func (c *ControlServer) handleIngressUpdate(oldObj interface{}, newObj interface{}) {
+
 	oldIng, ok := convertIngress(oldObj)
 	if !ok {
 		log.Errorf("type not allowed: %v", reflect.TypeOf(oldIng))
