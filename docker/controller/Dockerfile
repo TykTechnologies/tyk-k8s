@@ -22,9 +22,7 @@ FROM debian:buster-slim
 
 RUN apt-get update \
  && apt-get upgrade -y \
- && apt-get install -y --no-install-recommends \
-            curl ca-certificates apt-transport-https debian-archive-keyring gnupg \
- && apt-get purge -y gnupg \
+ && apt-get install -y --no-install-recommends ca-certificates \
  && apt-get autoremove -y \
  && rm -rf /root/.cache
 
