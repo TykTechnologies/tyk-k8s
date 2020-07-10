@@ -20,6 +20,12 @@ RUN CGO_ENABLED=0 go build -o tyk-k8s .
 ######## Start a new stage from scratch #######
 FROM debian:buster-slim
 
+RUN apt-get update \
+ && apt-get upgrade -y \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && apt-get autoremove -y \
+ && rm -rf /root/.cache
+
 RUN mkdir -p /opt/tyk-k8s
 WORKDIR /opt/tyk-k8s
 
