@@ -1,3 +1,9 @@
+# tyk-k8s is EOL.
+
+tyk-k8s will no longer be receiving any updates
+
+Please refer to [Tyk Operator](https://github.com/TykTechnologies/tyk-operator/) instead.
+
 # Tyk Kubernetes Controller
 
 This application performs two core functions:
